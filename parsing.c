@@ -18,6 +18,9 @@ long eval_op(long x, char* operator, long y) {
     if (strcmp(operator, "/") == 0) {
         return x / y;
     }
+    if (strcmp(operator, "%") == 0) {
+        return x % y;
+    }
 
     return 0;
 }
