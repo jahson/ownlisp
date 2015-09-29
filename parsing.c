@@ -24,6 +24,12 @@ long eval_op(long x, char* operator, long y) {
     if (strcmp(operator, "^") == 0) {
         return pow(x, y);
     }
+    if (strcmp(operator, "min") == 0) {
+        return x > y ? y : x;
+    }
+    if (strcmp(operator, "max") == 0) {
+        return x > y ? x : y;
+    }
 
     return 0;
 }
