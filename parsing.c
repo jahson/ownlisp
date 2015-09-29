@@ -5,7 +5,17 @@
 
 #include <editline/readline.h>
 
-long eval_op(long x, char* operator, long y) {
+long eval_unary_op(char* operator, long x) {
+    if (strcmp(operator, "-") == 0) {
+        return x = -x;
+    }
+
+    fprintf(stderr, "WARNING: not supported unary operator '%s'\n", operator);
+
+    return x;
+}
+
+long eval_op(char* operator, long x, long y) {
     if (strcmp(operator, "+") == 0) {
         return x + y;
     }
@@ -43,9 +53,13 @@ long eval(mpc_ast_t* t) {
     long x = eval(t->children[2]);
 
     int i = 3;
-    while (strstr(t->children[i]->tag, "expr")) {
-        x = eval_op(x, operator, eval(t->children[i]));
-        i++;
+    if (!strstr(t->children[3]->tag, "expr")) {
+        x = eval_unary_op(operator, x);
+    } else {
+        while (strstr(t->children[i]->tag, "expr")) {
+            x = eval_op(operator, x, eval(t->children[i]));
+            i++;
+        }
     }
 
     return x;
