@@ -16,19 +16,19 @@ long eval_unary_op(char* operator, long x) {
 }
 
 long eval_op(char* operator, long x, long y) {
-    if (strcmp(operator, "+") == 0) {
+    if (strcmp(operator, "+") == 0 || strcmp(operator, "add") == 0) {
         return x + y;
     }
-    if (strcmp(operator, "-") == 0) {
+    if (strcmp(operator, "-") == 0 || strcmp(operator, "sub") == 0) {
         return x - y;
     }
-    if (strcmp(operator, "*") == 0) {
+    if (strcmp(operator, "*") == 0 || strcmp(operator, "mul") == 0) {
         return x * y;
     }
-    if (strcmp(operator, "/") == 0) {
+    if (strcmp(operator, "/") == 0 || strcmp(operator, "div") == 0) {
         return x / y;
     }
-    if (strcmp(operator, "%") == 0) {
+    if (strcmp(operator, "%") == 0 || strcmp(operator, "mod") == 0) {
         return x % y;
     }
     if (strcmp(operator, "^") == 0) {
