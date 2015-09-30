@@ -7,8 +7,10 @@
 
 typedef struct {
     int type;
-    long num;
-    int err;
+    union {
+        long num;
+        int err;
+    } value;
 } lval;
 
 // possible lval types
@@ -19,14 +21,14 @@ enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM };
 lval lval_num(long x) {
     lval v;
     v.type = LVAL_NUM;
-    v.num = x;
+    v.value.num = x;
     return v;
 }
 
 lval lval_err(int x) {
     lval v;
     v.type = LVAL_ERR;
-    v.err = x;
+    v.value.err = x;
     return v;
 }
 
@@ -49,10 +51,10 @@ void print_error(int error_code) {
 void lval_print(lval v) {
     switch (v.type) {
         case LVAL_NUM:
-            printf("%li", v.num);
+            printf("%li", v.value.num);
             break;
         case LVAL_ERR:
-            print_error(v.err);
+            print_error(v.value.err);
             break;
     }
 }
@@ -64,7 +66,7 @@ void lval_println(lval v) {
 
 lval eval_unary_op(char* operator, lval x) {
     if (strcmp(operator, "-") == 0) {
-        return lval_num(-x.num);
+        return lval_num(-x.value.num);
     }
     return lval_err(LERR_BAD_OP);
 }
@@ -78,30 +80,30 @@ lval eval_op(char* operator, lval x, lval y) {
     }
 
     if (strcmp(operator, "+") == 0 || strcmp(operator, "add") == 0) {
-        return lval_num(x.num + y.num);
+        return lval_num(x.value.num + y.value.num);
     }
     if (strcmp(operator, "-") == 0 || strcmp(operator, "sub") == 0) {
-        return lval_num(x.num - y.num);
+        return lval_num(x.value.num - y.value.num);
     }
     if (strcmp(operator, "*") == 0 || strcmp(operator, "mul") == 0) {
-        return lval_num(x.num * y.num);
+        return lval_num(x.value.num * y.value.num);
     }
     if (strcmp(operator, "/") == 0 || strcmp(operator, "div") == 0) {
-        return y.num == 0
+        return y.value.num == 0
             ? lval_err(LERR_DIV_ZERO)
-            : lval_num(x.num / y.num);
+            : lval_num(x.value.num / y.value.num);
     }
     if (strcmp(operator, "%") == 0 || strcmp(operator, "mod") == 0) {
-        return lval_num(x.num % y.num);
+        return lval_num(x.value.num % y.value.num);
     }
     if (strcmp(operator, "^") == 0) {
-        return lval_num(pow(x.num, y.num));
+        return lval_num(pow(x.value.num, y.value.num));
     }
     if (strcmp(operator, "min") == 0) {
-        return x.num > y.num ? y : x;
+        return x.value.num > y.value.num ? y : x;
     }
     if (strcmp(operator, "max") == 0) {
-        return x.num > y.num ? x : y;
+        return x.value.num > y.value.num ? x : y;
     }
 
     return lval_err(LERR_BAD_OP);
