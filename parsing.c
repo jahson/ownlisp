@@ -176,6 +176,12 @@ void lval_print(lval* v) {
         case LVAL_SEXPR:
             lval_expr_print(v, '(', ')');
             break;
+        case LVAL_ERROR:
+            printf("Error: %s", v->val.error);
+            break;
+        default:
+            printf("Error: Unknown value type %d", v->type);
+            break;
     }
 }
 
@@ -184,129 +190,248 @@ void lval_println(lval* v) {
     putchar('\n');
 }
 
-lval* eval_unary_op(char* operator, lval* x) {
-    if (strcmp(operator, "-") == 0) {
-        switch(x->type) {
-            case LVAL_INTEGER:
-                return lval_integer(-x->val.integer);
-                break;
-            case LVAL_DECIMAL:
-                return lval_decimal(-x->val.decimal);
-                break;
-        }
-    }
-    return lval_error("Wrong unary operator");
+lval* lval_pop(lval* v, int i) {
+    lval* x = v->cell[i];
+
+    // shift memory after the item at 'i' over the top and reallocate memory used
+    memmove(&v->cell[i], &v->cell[i + 1], sizeof(lval*) * (v->count - i - 1));
+    v->count--;
+    v->cell = realloc(v->cell, sizeof(lval*) * v->count);
+
+    return x;
 }
 
-lval* eval_op(char* operator, lval* x, lval* y) {
-    if (x->type == LVAL_ERROR) {
-        return x;
-    }
-    if (y->type == LVAL_ERROR) {
-        return y;
+lval* lval_take(lval* v, int i) {
+    lval* x = lval_pop(v, i);
+    lval_delete(v);
+    return x;
+}
+
+lval* builtin_op(char* operator, lval* a) {
+    for (int i = 0; i < a->count; i++) {
+        if (a->cell[i]->type != LVAL_INTEGER && a->cell[i]->type != LVAL_DECIMAL) {
+            lval_delete(a);
+            return lval_error("Cannot operate on non-number");
+        }
     }
 
-    if (strcmp(operator, "+") == 0 || strcmp(operator, "add") == 0) {
-        if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-            return lval_decimal(x->val.decimal + y->val.decimal);
-        } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-            return lval_decimal(x->val.decimal + (double)y->val.integer);
-        } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-            return lval_integer(x->val.integer + (int)y->val.decimal);
-        } else {
-            return lval_integer(x->val.integer + y->val.integer);
+    lval* x = lval_pop(a, 0);
+
+    // unary negation
+    if ((strcmp(operator, "-") == 0) && a->count == 0) {
+        switch(x->type) {
+            case LVAL_INTEGER:
+                x->val.integer = -x->val.integer;
+                break;
+            case LVAL_DECIMAL:
+                x->val.decimal = -x->val.decimal;
+                break;
         }
-    }
-    if (strcmp(operator, "-") == 0 || strcmp(operator, "sub") == 0) {
-        if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-            return lval_decimal(x->val.decimal - y->val.decimal);
-        } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-            return lval_decimal(x->val.decimal - y->val.integer);
-        } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-            return lval_integer(x->val.integer - (int)y->val.decimal);
-        } else {
-            return lval_integer(x->val.integer - y->val.integer);
-        }
-    }
-    if (strcmp(operator, "*") == 0 || strcmp(operator, "mul") == 0) {
-        if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-            return lval_decimal(x->val.decimal * y->val.decimal);
-        } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-            return lval_decimal(x->val.decimal * y->val.integer);
-        } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-            return lval_integer(x->val.integer * (int)y->val.decimal);
-        } else {
-            return lval_integer(x->val.integer * y->val.integer);
-        }
-    }
-    if (strcmp(operator, "/") == 0 || strcmp(operator, "div") == 0) {
-        if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-            return y->val.decimal == 0.0
-                ? lval_error("Division by zero")
-                : lval_decimal(x->val.decimal / y->val.decimal);
-        } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-            return y->val.integer == 0
-                ? lval_error("Division by zero")
-                : lval_decimal(x->val.decimal / y->val.integer);
-        } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-            return y->val.decimal == 0.0
-                ? lval_error("Division by zero")
-                : lval_decimal(x->val.integer / (int)y->val.decimal);
-        } else {
-            return y->val.integer == 0
-                ? lval_error("Division by zero")
-                : lval_decimal(x->val.integer / y->val.integer);
-        }
-    }
-    if (strcmp(operator, "%") == 0 || strcmp(operator, "mod") == 0) {
-        if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-            return lval_decimal(fmod(x->val.decimal, y->val.decimal));
-        } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-            return lval_decimal(fmod(x->val.decimal, y->val.integer));
-        } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-            return lval_integer(fmod(x->val.integer, (int)y->val.decimal));
-        } else {
-            return lval_integer((int)fmod(x->val.integer, y->val.integer));
-        }
-    }
-    if (strcmp(operator, "^") == 0) {
-        if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-            return lval_decimal(pow(x->val.decimal, y->val.decimal));
-        } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-            return lval_decimal(pow(x->val.decimal, y->val.integer));
-        } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-            return lval_integer(pow(x->val.integer, y->val.decimal));
-        } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-            return lval_integer(pow(x->val.integer, (int)y->val.decimal));
-        } else {
-            return lval_integer(pow(x->val.integer, y->val.integer));
-        }
-    }
-    if (strcmp(operator, "min") == 0) {
-        if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-            return x->val.decimal < y->val.decimal ? x : y;
-        } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-            return x->val.decimal < y->val.integer ? x : y;
-        } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-            return x->val.integer < y->val.decimal ? x : y;
-        } else {
-            return x->val.integer < y->val.integer ? x : y;
-        }
-    }
-    if (strcmp(operator, "max") == 0) {
-        if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-            return x->val.decimal > y->val.decimal ? x : y;
-        } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-            return x->val.decimal > y->val.integer ? x : y;
-        } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-            return x->val.integer > y->val.decimal ? x : y;
-        } else {
-            return x->val.integer > y->val.integer ? x : y;
-        }
-        return x->val.integer > y->val.integer ? x : y;
     }
 
-    return lval_error("Unknown operator");
+    while (a->count > 0) {
+        lval* y = lval_pop(a, 0);
+
+        if (strcmp(operator, "+") == 0 || strcmp(operator, "add") == 0) {
+            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
+                x->val.decimal += y->val.decimal;
+            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
+                x->val.decimal += y->val.integer;
+            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
+                x->val.integer += (int)y->val.decimal;
+            } else {
+                x->val.integer += y->val.integer;
+            }
+        }
+
+        if (strcmp(operator, "-") == 0 || strcmp(operator, "sub") == 0) {
+            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
+                x->val.decimal -= y->val.decimal;
+            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
+                x->val.decimal -= y->val.integer;
+            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
+                x->val.integer -= (int)y->val.decimal;
+            } else {
+                x->val.integer -= y->val.integer;
+            }
+        }
+
+        if (strcmp(operator, "*") == 0 || strcmp(operator, "mul") == 0) {
+            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
+                x->val.decimal *= y->val.decimal;
+            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
+                x->val.decimal *= y->val.integer;
+            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
+                x->val.integer *= (int)y->val.decimal;
+            } else {
+                x->val.integer *= y->val.integer;
+            }
+        }
+
+        if (strcmp(operator, "/") == 0 || strcmp(operator, "div") == 0) {
+            switch (y->type) {
+                case LVAL_DECIMAL:
+                    if (y->val.decimal == 0.0) {
+                        lval_delete(x);
+                        lval_delete(y);
+                        lval_delete(a);
+                        return lval_error("Division by zero");
+                    }
+                    break;
+                case LVAL_INTEGER:
+                    if (y->val.integer == 0) {
+                        lval_delete(x);
+                        lval_delete(y);
+                        lval_delete(a);
+                        return lval_error("Division by zero");
+                    }
+                    break;
+            }
+
+            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
+                x->val.decimal /= y->val.decimal;
+            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
+                x->val.decimal /= y->val.integer;
+            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
+                x->val.integer /= y->val.decimal;
+            } else {
+                x->val.integer /= y->val.integer;
+            }
+        }
+
+        if (strcmp(operator, "%") == 0 || strcmp(operator, "mod") == 0) {
+            switch (y->type) {
+                case LVAL_DECIMAL:
+                    if (y->val.decimal == 0.0) {
+                        lval_delete(x);
+                        lval_delete(y);
+                        lval_delete(a);
+                        return lval_error("Division by zero");
+                    }
+                    break;
+                case LVAL_INTEGER:
+                    if (y->val.integer == 0) {
+                        lval_delete(x);
+                        lval_delete(y);
+                        lval_delete(a);
+                        return lval_error("Division by zero");
+                    }
+                    break;
+            }
+
+            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
+                x->val.decimal = fmod(x->val.decimal, y->val.decimal);
+            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
+                x->val.decimal = fmod(x->val.decimal, y->val.integer);
+            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
+                x->val.integer = fmod(x->val.integer, (int)y->val.decimal);
+            } else {
+                x->val.integer = (int)fmod(x->val.integer, y->val.integer);
+            }
+        }
+
+        if (strcmp(operator, "^") == 0) {
+            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
+                x->val.decimal = pow(x->val.decimal, y->val.decimal);
+            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
+                x->val.decimal = pow(x->val.decimal, y->val.integer);
+            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
+                x->val.integer = (int)pow(x->val.integer, y->val.decimal);
+            } else {
+                x->val.integer = pow(x->val.integer, y->val.integer);
+            }
+        }
+
+        if (strcmp(operator, "min") == 0) {
+            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
+                x->val.decimal = x->val.decimal < y->val.decimal
+                    ? x->val.decimal
+                    : y->val.decimal;
+            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
+                x->val.decimal = x->val.decimal < y->val.integer
+                    ? x->val.decimal
+                    : (double)y->val.integer;
+            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
+                x->val.integer = x->val.integer < y->val.decimal
+                    ? x->val.integer
+                    : (int)y->val.decimal;
+            } else {
+                x->val.integer = x->val.integer < y->val.integer
+                    ? x->val.integer
+                    : y->val.integer;
+            }
+        }
+        if (strcmp(operator, "max") == 0) {
+            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
+                x->val.decimal = x->val.decimal > y->val.decimal
+                    ? x->val.decimal
+                    : y->val.decimal;
+            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
+                x->val.decimal = x->val.decimal > y->val.integer
+                    ? x->val.decimal
+                    : (double)y->val.integer;
+            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
+                x->val.integer = x->val.integer > y->val.decimal
+                    ? x->val.integer
+                    : (int)y->val.decimal;
+            } else {
+                x->val.integer = x->val.integer > y->val.integer
+                    ? x->val.integer
+                    : y->val.integer;
+            }
+        }
+
+        lval_delete(y);
+    }
+
+    lval_delete(a);
+    return x;
+}
+
+lval* lval_eval(lval* v); // forward declare to use in 'lval_eval_sexpr'
+lval* lval_eval_sexpr(lval* v) {
+    // evaluate children
+    for (int i = 0; i < v->count; i++) {
+        v->cell[i] = lval_eval(v->cell[i]);
+    }
+
+    // check errors
+    for (int i = 0; i < v->count; i++) {
+        if (v->cell[i]->type == LVAL_ERROR) {
+            return lval_take(v, i);
+        }
+    }
+
+    // empty expression
+    if (v->count == 0) {
+        return v;
+    }
+
+    // single expression
+    if (v->count == 1) {
+        return lval_take(v, 0);
+    }
+
+    // first element should be Symbol
+    lval* f = lval_pop(v, 0);
+    if (f->type != LVAL_SYMBOL) {
+        lval_delete(f);
+        lval_delete(v);
+        return lval_error("S-expression does not start with symbol");
+    }
+
+    lval* result = builtin_op(f->val.symbol, v);
+    lval_delete(f);
+
+    return result;
+}
+
+lval* lval_eval(lval* v) {
+    // only evaluate s-expressions
+    if (v->type == LVAL_SEXPR) {
+        return lval_eval_sexpr(v);
+    }
+    return v;
 }
 
 int main(int argc, char** argv) {
@@ -341,9 +466,8 @@ int main(int argc, char** argv) {
 
         mpc_result_t r;
         if (mpc_parse("<stdin>", input, Lliisspp, &r)) {
-            lval* x = lval_read(r.output);
+            lval* x = lval_eval(lval_read(r.output));
             lval_println(x);
-
             lval_delete(x);
             mpc_ast_delete(r.output);
         } else {
