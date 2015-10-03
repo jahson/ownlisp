@@ -19,9 +19,17 @@ typedef struct lval {
 } lval;
 
 // possible lval types
-enum { LVAL_INTEGER, LVAL_DECIMAL, LVAL_ERROR, LVAL_SYMBOL, LVAL_SEXPR };
+enum { LVAL_INTEGER, LVAL_DECIMAL, LVAL_ERROR, LVAL_SYMBOL, LVAL_SEXPRESSION, LVAL_QEXPRESSION };
 // possible error types
 enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM };
+
+lval* lval_qepression(void) {
+    lval* v = malloc(sizeof(lval));
+    v->type = LVAL_QEXPRESSION;
+    v->count = 0;
+    v->cell = NULL;
+    return v;
+}
 
 lval* lval_integer(long x) {
     lval* v = malloc(sizeof(lval));
@@ -53,9 +61,9 @@ lval* lval_symbol(char* m) {
     return v;
 }
 
-lval* lval_sexpr(void) {
+lval* lval_sexpression(void) {
     lval* v = malloc(sizeof(lval));
-    v->type = LVAL_SEXPR;
+    v->type = LVAL_SEXPRESSION;
     v->count = 0;
     v->cell = NULL;
     return v;
@@ -75,7 +83,8 @@ void lval_delete(lval* v) {
             free(v->val.symbol);
             break;
 
-        case LVAL_SEXPR:
+        case LVAL_QEXPRESSION:
+        case LVAL_SEXPRESSION:
             // free memory for all elements inside
             for (int i = 0; i < v->count; i++) {
                 lval_delete(v->cell[i]);
@@ -127,7 +136,10 @@ lval* lval_read(mpc_ast_t* t) {
         strcmp(t->tag, ">") == 0 ||
         strstr(t->tag, "sexpr")
         ) {
-        x = lval_sexpr();
+        x = lval_sexpression();
+    }
+    if (strstr(t->tag, "qexpr")) {
+        x = lval_qepression();
     }
 
     // fill the list with any valid expression contained within
@@ -173,8 +185,11 @@ void lval_print(lval* v) {
         case LVAL_SYMBOL:
             printf("%s", v->val.symbol);
             break;
-        case LVAL_SEXPR:
+        case LVAL_SEXPRESSION:
             lval_expr_print(v, '(', ')');
+            break;
+        case LVAL_QEXPRESSION:
+            lval_expr_print(v, '{', '}');
             break;
         case LVAL_ERROR:
             printf("Error: %s", v->val.error);
@@ -428,7 +443,7 @@ lval* lval_eval_sexpr(lval* v) {
 
 lval* lval_eval(lval* v) {
     // only evaluate s-expressions
-    if (v->type == LVAL_SEXPR) {
+    if (v->type == LVAL_SEXPRESSION) {
         return lval_eval_sexpr(v);
     }
     return v;
@@ -440,6 +455,7 @@ int main(int argc, char** argv) {
     mpc_parser_t* Integer = mpc_new("integer");
     mpc_parser_t* Symbol = mpc_new("symbol");
     mpc_parser_t* Sexpr = mpc_new("sexpr");
+    mpc_parser_t* Qexpr = mpc_new("qexpr");
     mpc_parser_t* Expr = mpc_new("expr");
     mpc_parser_t* Lliisspp = mpc_new("lispy");
 
@@ -454,7 +470,16 @@ int main(int argc, char** argv) {
 
     grammar[fsize] = 0;
 
-    mpca_lang(MPCA_LANG_DEFAULT, grammar, Number, Decimal, Integer, Symbol, Sexpr, Expr, Lliisspp);
+    mpca_lang(MPCA_LANG_DEFAULT,
+              grammar,
+              Number,
+              Decimal,
+              Integer,
+              Symbol,
+              Sexpr,
+              Qexpr,
+              Expr,
+              Lliisspp);
 
     puts("lliisspp version 0.0.1");
     puts("Press Ctrl+C to Exit\n");
@@ -479,7 +504,15 @@ int main(int argc, char** argv) {
     }
 
     free(grammar);
-    mpc_cleanup(7, Number, Decimal, Integer, Symbol, Sexpr, Expr, Lliisspp);
+    mpc_cleanup(8,
+                Number,
+                Decimal,
+                Integer,
+                Symbol,
+                Sexpr,
+                Qexpr,
+                Expr,
+                Lliisspp);
 
     return 0;
 }

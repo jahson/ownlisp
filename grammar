@@ -3,5 +3,6 @@ integer  : /-?[0-9]+/ ;
 number   : <decimal> | <integer> ;
 symbol   : '+' | '-' | '*' | '/' | '%' | '^' | "add" | "sub" | "mul" | "div" | "mod" | "pow" | "min" | "max" ;
 sexpr    : '(' <expr>* ')' ;
-expr     : <number> | <symbol> | <sexpr> ;
+qexpr    : '{' <expr>* '}' ;
+expr     : <number> | <symbol> | <sexpr> | <qexpr> ;
 lispy    : /^/ <expr>* /$/ ;
