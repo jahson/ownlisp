@@ -6,6 +6,12 @@
 
 #include <editline/readline.h>
 
+#define LASSERT(args, cond, error_msg) \
+    if (!(cond)) { \
+        lval_delete(args); \
+        return lval_error(error_msg); \
+    }
+
 typedef struct lval {
     int type;
     union {
@@ -404,18 +410,12 @@ lval* builtin_op(char* operator, lval* a) {
 }
 
 lval* builtin_head(lval* a) {
-    if (a->count != 1) {
-        lval_delete(a);
-        return lval_error("Too many arguments for 'head'. Should be one.")
-    }
-    if (a->cell[0]->type != LVAL_QEXPRESSION) {
-        lval_delete(a);
-        return lval_error("Incorrect argument type for 'head'. Should be q-expression.")
-    }
-    if (a->cell[0]->count == 0) {
-        lval_delete(a);
-        return lval_error("Empty q-expression for 'head'.")
-    }
+    LASSERT(a, a->count == 1,
+            "Too many arguments for 'head'. Should be one.");
+    LASSERT(a, a->cell[0]->type != LVAL_QEXPRESSION,
+            "Incorrect argument type for 'head'. Should be q-expression.");
+    LASSERT(a, a->cell[0]->count == 0,
+            "Empty q-expression for 'head'.");
 
     lval* v = lval_take(a, 0);
     // delete all elements that are not head and return
@@ -426,18 +426,12 @@ lval* builtin_head(lval* a) {
 }
 
 lval* builtin_tail(lval* a) {
-    if (a->count != 1) {
-        lval_delete(a);
-        return lval_error("Too many arguments for 'tail'. Should be one.")
-    }
-    if (a->cell[0]->type != LVAL_QEXPRESSION) {
-        lval_delete(a);
-        return lval_error("Incorrect argument type for 'tail'. Should be q-expression.")
-    }
-    if (a->cell[0]->count == 0) {
-        lval_delete(a);
-        return lval_error("Empty q-expression for 'tail'.")
-    }
+    LASSERT(a, a->count == 1,
+            "Too many arguments for 'tail'. Should be one.");
+    LASSERT(a, a->cell[0]->type != LVAL_QEXPRESSION,
+            "Incorrect argument type for 'tail'. Should be q-expression.");
+    LASSERT(a, a->cell[0]->count == 0,
+            "Empty q-expression for 'tail'.");
 
     lval* v = lval_take(a, 0);
     // delete first element and return
