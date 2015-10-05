@@ -228,6 +228,14 @@ lval* lval_take(lval* v, int i) {
     return x;
 }
 
+lval* lval_join(lval* x, lval* y) {
+    while (y->count) {
+        x = lval_add(x, lval_pop(y, 0));
+    }
+    lval_delete(y);
+    return x;
+}
+
 lval* builtin_op(char* operator, lval* a) {
     for (int i = 0; i < a->count; i++) {
         if (a->cell[i]->type != LVAL_INTEGER && a->cell[i]->type != LVAL_DECIMAL) {
@@ -439,7 +447,51 @@ lval* builtin_tail(lval* a) {
     return v;
 }
 
-lval* lval_eval(lval* v); // forward declare to use in 'lval_eval_sexpr'
+lval* builtin_list(lval* a) {
+    a->type = LVAL_QEXPRESSION;
+    return a;
+}
+
+lval* lval_eval(lval* v); // forward declare
+
+lval* builtin_eval(lval* a) {
+    LASSERT(a, a->count == 1,
+            "Too many arguments for 'eval'. Should be one.");
+    LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
+            "Incorrect argument type for 'eval'. Should be q-expression.");
+
+    lval* x = lval_take(a, 0);
+    x->type = LVAL_SEXPRESSION;
+    return lval_eval(x);
+}
+
+lval* builtin_join(lval* a) {
+    for (int i = 0; i < a->count; i++) {
+        LASSERT(a, a->cell[i]->type == LVAL_QEXPRESSION,
+                "Incorrect argument type for 'join'. Should be q-expression.");
+    }
+
+    lval* x = lval_pop(a, 0);
+    while (a->count) {
+        x = lval_join(x, lval_pop(a, 0));
+    }
+    lval_delete(a);
+    return x;
+}
+
+lval* builtin(char* fn, lval* a) {
+    if (strcmp("list", fn) == 0) { return builtin_list(a); }
+    if (strcmp("head", fn) == 0) { return builtin_head(a); }
+    if (strcmp("tail", fn) == 0) { return builtin_tail(a); }
+    if (strcmp("join", fn) == 0) { return builtin_join(a); }
+    if (strcmp("eval", fn) == 0) { return builtin_eval(a); }
+    if (strstr("add sub div mod mul min max pow +-/*%", fn)) {
+        return builtin_op(fn, a);
+    }
+    lval_delete(a);
+    return lval_error("Unknown Function!");
+}
+
 lval* lval_eval_sexpr(lval* v) {
     // evaluate children
     for (int i = 0; i < v->count; i++) {
@@ -471,7 +523,7 @@ lval* lval_eval_sexpr(lval* v) {
         return lval_error("S-expression does not start with symbol");
     }
 
-    lval* result = builtin_op(f->val.symbol, v);
+    lval* result = builtin(f->val.symbol, v);
     lval_delete(f);
 
     return result;
