@@ -412,9 +412,9 @@ lval* builtin_op(char* operator, lval* a) {
 lval* builtin_head(lval* a) {
     LASSERT(a, a->count == 1,
             "Too many arguments for 'head'. Should be one.");
-    LASSERT(a, a->cell[0]->type != LVAL_QEXPRESSION,
+    LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
             "Incorrect argument type for 'head'. Should be q-expression.");
-    LASSERT(a, a->cell[0]->count == 0,
+    LASSERT(a, a->cell[0]->count != 0,
             "Empty q-expression for 'head'.");
 
     lval* v = lval_take(a, 0);
@@ -428,9 +428,9 @@ lval* builtin_head(lval* a) {
 lval* builtin_tail(lval* a) {
     LASSERT(a, a->count == 1,
             "Too many arguments for 'tail'. Should be one.");
-    LASSERT(a, a->cell[0]->type != LVAL_QEXPRESSION,
+    LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
             "Incorrect argument type for 'tail'. Should be q-expression.");
-    LASSERT(a, a->cell[0]->count == 0,
+    LASSERT(a, a->cell[0]->count != 0,
             "Empty q-expression for 'tail'.");
 
     lval* v = lval_take(a, 0);
