@@ -403,6 +403,48 @@ lval* builtin_op(char* operator, lval* a) {
     return x;
 }
 
+lval* builtin_head(lval* a) {
+    if (a->count != 1) {
+        lval_delete(a);
+        return lval_error("Too many arguments for 'head'. Should be one.")
+    }
+    if (a->cell[0]->type != LVAL_QEXPRESSION) {
+        lval_delete(a);
+        return lval_error("Incorrect argument type for 'head'. Should be q-expression.")
+    }
+    if (a->cell[0]->count == 0) {
+        lval_delete(a);
+        return lval_error("Empty q-expression for 'head'.")
+    }
+
+    lval* v = lval_take(a, 0);
+    // delete all elements that are not head and return
+    while (v->count > 1) {
+        lval_delete(lval_pop(v, 1));
+    }
+    return v;
+}
+
+lval* builtin_tail(lval* a) {
+    if (a->count != 1) {
+        lval_delete(a);
+        return lval_error("Too many arguments for 'tail'. Should be one.")
+    }
+    if (a->cell[0]->type != LVAL_QEXPRESSION) {
+        lval_delete(a);
+        return lval_error("Incorrect argument type for 'tail'. Should be q-expression.")
+    }
+    if (a->cell[0]->count == 0) {
+        lval_delete(a);
+        return lval_error("Empty q-expression for 'tail'.")
+    }
+
+    lval* v = lval_take(a, 0);
+    // delete first element and return
+    lval_delete(lval_pop(v, 0));
+    return v;
+}
+
 lval* lval_eval(lval* v); // forward declare to use in 'lval_eval_sexpr'
 lval* lval_eval_sexpr(lval* v) {
     // evaluate children
