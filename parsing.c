@@ -417,6 +417,20 @@ lval* builtin_op(char* operator, lval* a) {
     return x;
 }
 
+lval* builtin_init(lval* a) {
+    LASSERT(a, a->count == 1,
+            "Too many arguments for 'init'. Should be one.");
+    LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
+            "Incorrect argument type for 'init'. Should be q-expression.");
+    LASSERT(a, a->cell[0]->count != 0,
+            "Empty q-expression for 'init'.");
+
+    lval* v = lval_take(a, 0);
+    // delete last element and return
+    lval_delete(lval_pop(v, (v->count - 1)));
+    return v;
+}
+
 lval* builtin_head(lval* a) {
     LASSERT(a, a->count == 1,
             "Too many arguments for 'head'. Should be one.");
@@ -445,6 +459,19 @@ lval* builtin_tail(lval* a) {
     // delete first element and return
     lval_delete(lval_pop(v, 0));
     return v;
+}
+
+lval* builtin_len(lval* a) {
+    LASSERT(a, a->count == 1,
+            "Too many arguments for 'len'. Should be one.");
+    LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
+            "Incorrect argument type for 'len'. Should be q-expression.");
+
+    lval* x = lval_take(a, 0);
+    int len = x->count;
+    lval_delete(x);
+
+    return lval_integer(len);
 }
 
 lval* builtin_list(lval* a) {
@@ -480,6 +507,8 @@ lval* builtin_join(lval* a) {
 }
 
 lval* builtin(char* fn, lval* a) {
+    if (strcmp("len", fn) == 0) { return builtin_len(a); }
+    if (strcmp("init", fn) == 0) { return builtin_init(a); }
     if (strcmp("list", fn) == 0) { return builtin_list(a); }
     if (strcmp("head", fn) == 0) { return builtin_head(a); }
     if (strcmp("tail", fn) == 0) { return builtin_tail(a); }
