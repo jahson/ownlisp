@@ -417,6 +417,25 @@ lval* builtin_op(char* operator, lval* a) {
     return x;
 }
 
+lval* builtin_cons(lval* a) {
+    LASSERT(a, a->count == 2,
+            "Wrong number of arguments for 'cons'. Should be two.");
+    LASSERT(a, a->cell[1]->type == LVAL_QEXPRESSION,
+            "Incorrect second argument type for 'cons'. Should be q-expression.");
+
+    lval* x = lval_pop(a, 0);
+    lval* v = lval_pop(a, 0);
+    lval_delete(a);
+
+    v->count++;
+    // realloc and unshift memory
+    v->cell = realloc(v->cell, sizeof(lval*) * v->count);
+    memmove(&v->cell[1], &v->cell[0], sizeof(lval*) * (v->count - 1));
+    v->cell[0] = x;
+
+    return v;
+}
+
 lval* builtin_init(lval* a) {
     LASSERT(a, a->count == 1,
             "Too many arguments for 'init'. Should be one.");
@@ -507,6 +526,7 @@ lval* builtin_join(lval* a) {
 }
 
 lval* builtin(char* fn, lval* a) {
+    if (strcmp("cons", fn) == 0) { return builtin_cons(a); }
     if (strcmp("len", fn) == 0) { return builtin_len(a); }
     if (strcmp("init", fn) == 0) { return builtin_init(a); }
     if (strcmp("list", fn) == 0) { return builtin_list(a); }
@@ -610,7 +630,6 @@ int main(int argc, char** argv) {
         if (mpc_parse("<stdin>", input, Lliisspp, &r)) {
             lval* x = lval_eval(lval_read(r.output));
             lval_println(x);
-            lval_delete(x);
             mpc_ast_delete(r.output);
         } else {
             mpc_err_print(r.error);
