@@ -1,7 +1,7 @@
 decimal  : /-?[0-9]+\.[0-9]+/ ;
 integer  : /-?[0-9]+/ ;
 number   : <decimal> | <integer> ;
-symbol   : '+' | '-' | '*' | '/' | '%' | '^' | "add" | "sub" | "mul" | "div" | "mod" | "pow" | "min" | "max" | "list" | "head" | "tail" | "join" | "eval" | "len" | "init" | "cons" ;
+symbol   : /[a-zA-Z0-9_+-*\/\\=<>!&%^+/ ;
 sexpr    : '(' <expr>* ')' ;
 qexpr    : '{' <expr>* '}' ;
 expr     : <number> | <symbol> | <sexpr> | <qexpr> ;
