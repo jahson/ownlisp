@@ -153,8 +153,9 @@ void lenv_put(lenv *env, lval *key, lval *value) {
     env->count++;
     env->values = realloc(env->values, sizeof(lval*) * env->count);
     env->names = realloc(env->names, sizeof(char*) * env->count);
+
     env->values[env->count - 1] = lval_copy(value);
-    env->names = malloc(strlen(key->val.symbol) + 1);
+    env->names[env->count - 1] = malloc(strlen(key->val.symbol) + 1);
     strcpy(env->names[env->count - 1], key->val.symbol);
 }
 
