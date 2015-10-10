@@ -703,6 +703,27 @@ lval* builtin_list(lenv *env, lval* a) {
     return a;
 }
 
+lval* builtin_def(lenv *env, lval *a) {
+    LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
+            "First argument of 'def' should be q-expression");
+    // First argument is list of symbols
+    lval *names = a->cell[0];
+    for (int i = 0; i < names->count; i++) {
+        LASSERT(a, names->cell[i]->type == LVAL_SYMBOL,
+               "'def' cannot define non-symbol");
+    }
+
+    LASSERT(a, names->count == a->count - 1,
+            "Function 'def' cannot define incorrect number of values to symbols");
+
+    for (int i = 0; i < names->count; i++) {
+        lenv_put(env, names->cell[i], a->cell[i + 1]);
+    }
+
+    lval_delete(a);
+    return lval_sexpression();
+}
+
 lval* lval_eval(lenv *env, lval *v);
 lval* lval_eval_sexpr(lenv *env, lval *v) {
     // evaluate children
@@ -808,6 +829,9 @@ void lenv_add_builtins(lenv *env) {
     lenv_add_builtin(env, "/", builtin_div);
     lenv_add_builtin(env, "%", builtin_div);
     lenv_add_builtin(env, "^", builtin_pow);
+    
+    /* Variable Functions */
+    lenv_add_builtin(env, "def", builtin_def);
 }
 
 int main(int argc, char** argv) {
@@ -831,6 +855,7 @@ int main(int argc, char** argv) {
 
     grammar[fsize] = 0;
 
+    // todo [10.10.2015]: use mpca_lang_file and handle errors
     mpca_lang(MPCA_LANG_DEFAULT,
               grammar,
               Number,
