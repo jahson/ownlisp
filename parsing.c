@@ -100,6 +100,9 @@ lval* lval_copy(lval *a) {
         case LVAL_FUNCTION:
             x->val.fn = a->val.fn;
             break;
+        case LVAL_INTEGER:
+            x->val.integer = a->val.integer;
+            break;
         case LVAL_DECIMAL:
             x->val.decimal = a->val.decimal;
             break;
