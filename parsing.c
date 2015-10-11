@@ -1,3 +1,4 @@
+#pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 #include "mpc.h"
 
 #include <stdio.h>
