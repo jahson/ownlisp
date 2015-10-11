@@ -6,10 +6,11 @@
 
 #include <editline/readline.h>
 
-#define LASSERT(args, cond, error_msg) \
+#define LASSERT(args, cond, format, ...) \
     if (!(cond)) { \
+        lval *err = lval_err(format, ##__VA_ARGS__); \
         lval_delete(args); \
-        return lval_error(error_msg); \
+        return err; \
     }
 
 // forward declarations
@@ -126,11 +127,21 @@ lval* lval_copy(lval *a) {
     return x;
 }
 
-lval* lval_error(char* m) {
+lval* lval_error(char* format, ...) {
     lval* v = malloc(sizeof(lval));
     v->type = LVAL_ERROR;
-    v->val.error = malloc(strlen(m) + 1);
-    strcpy(v->val.error, m);
+
+    va_list va;
+    va_start(va, format);
+
+    v->val.error = malloc(512);
+
+    vsprintf(v->val.error, 511, format, va);
+
+    v->val.error = realloc(v->val.error, strlen(v->val.error) + 1);
+
+    va_end(va);
+
     return v;
 }
 
@@ -140,7 +151,7 @@ lval* lenv_get(lenv* env, lval *key) {
             return lval_copy(env->values[i]);
         }
     }
-    return lval_error("Unbound symbol!");
+    return lval_error("Unbound symbol '%s'", key->val.symbol);
 }
 
 void lenv_put(lenv *env, lval *key, lval *value) {
