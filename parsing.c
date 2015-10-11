@@ -8,7 +8,7 @@
 
 #define LASSERT(args, cond, format, ...) \
     if (!(cond)) { \
-        lval *err = lval_err(format, ##__VA_ARGS__); \
+        lval *err = lval_error(format, ##__VA_ARGS__); \
         lval_delete(args); \
         return err; \
     }
@@ -43,6 +43,27 @@ enum {
     LVAL_INTEGER, LVAL_DECIMAL, LVAL_ERROR, LVAL_SYMBOL, LVAL_SEXPRESSION,
     LVAL_QEXPRESSION, LVAL_FUNCTION
 };
+
+char* ltype_name(int t) {
+    switch (t) {
+        case LVAL_INTEGER:
+            return "Integer";
+        case LVAL_DECIMAL:
+            return "Decimal";
+        case LVAL_ERROR:
+            return "Error";
+        case LVAL_SYMBOL:
+            return "Symbol";
+        case LVAL_SEXPRESSION:
+            return "S-Expression";
+        case LVAL_QEXPRESSION:
+            return "Q-Expression";
+        case LVAL_FUNCTION:
+            return "Function";
+        default:
+            return "Unknown";
+    }
+}
 
 lenv *lenv_new(void) {
     lenv *env = malloc(sizeof(lenv));
@@ -136,7 +157,7 @@ lval* lval_error(char* format, ...) {
 
     v->val.error = malloc(512);
 
-    vsprintf(v->val.error, 511, format, va);
+    vsnprintf(v->val.error, 511, format, va);
 
     v->val.error = realloc(v->val.error, strlen(v->val.error) + 1);
 
@@ -638,9 +659,11 @@ lval* builtin_max(lenv *env, lval *a) {
 
 lval* builtin_cons(lenv *env, lval* a) {
     LASSERT(a, a->count == 2,
-            "Wrong number of arguments for 'cons'. Should be two.");
+            "Wrong number of arguments for 'cons'. Got %i, expected %i.",
+            a->count, 2);
     LASSERT(a, a->cell[1]->type == LVAL_QEXPRESSION,
-            "Incorrect second argument type for 'cons'. Should be q-expression.");
+            "Incorrect second argument type for 'cons'. Got %s, expected %s.",
+            ltype_name(a->cell[1]->type), ltype_name(LVAL_QEXPRESSION));
 
     lval* x = lval_pop(a, 0);
     lval* v = lval_pop(a, 0);
@@ -657,9 +680,11 @@ lval* builtin_cons(lenv *env, lval* a) {
 
 lval* builtin_init(lenv *env, lval* a) {
     LASSERT(a, a->count == 1,
-            "Too many arguments for 'init'. Should be one.");
+            "Wrong number of arguments for 'init'.  Got %i, expected %i.",
+            a->count, 1);
     LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
-            "Incorrect argument type for 'init'. Should be q-expression.");
+            "Incorrect first argument type for 'init'. Got %s, expected %s.",
+            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
     LASSERT(a, a->cell[0]->count != 0,
             "Empty q-expression for 'init'.");
 
@@ -671,9 +696,11 @@ lval* builtin_init(lenv *env, lval* a) {
 
 lval* builtin_head(lenv *env, lval* a) {
     LASSERT(a, a->count == 1,
-            "Too many arguments for 'head'. Should be one.");
+            "Wrong number of arguments for 'head'.  Got %i, expected %i.",
+            a->count, 1);
     LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
-            "Incorrect argument type for 'head'. Should be q-expression.");
+            "Incorrect first argument type for 'head'. Got %s, expected %s.",
+            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
     LASSERT(a, a->cell[0]->count != 0,
             "Empty q-expression for 'head'.");
 
@@ -687,9 +714,11 @@ lval* builtin_head(lenv *env, lval* a) {
 
 lval* builtin_tail(lenv *env, lval* a) {
     LASSERT(a, a->count == 1,
-            "Too many arguments for 'tail'. Should be one.");
+            "Wrong number of arguments for 'tail'.  Got %i, expected %i.",
+            a->count, 1);
     LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
-            "Incorrect argument type for 'tail'. Should be q-expression.");
+            "Incorrect first argument type for 'tail'. Got %s, expected %s.",
+            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
     LASSERT(a, a->cell[0]->count != 0,
             "Empty q-expression for 'tail'.");
 
@@ -701,9 +730,11 @@ lval* builtin_tail(lenv *env, lval* a) {
 
 lval* builtin_len(lenv *env, lval* a) {
     LASSERT(a, a->count == 1,
-            "Too many arguments for 'len'. Should be one.");
+            "Wrong number of arguments for 'len'.  Got %i, expected %i.",
+            a->count, 1);
     LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
-            "Incorrect argument type for 'len'. Should be q-expression.");
+            "Incorrect first argument type for 'len'. Got %s, expected %s.",
+            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
 
     lval* x = lval_take(a, 0);
     int len = x->count;
@@ -719,7 +750,8 @@ lval* builtin_list(lenv *env, lval* a) {
 
 lval* builtin_def(lenv *env, lval *a) {
     LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
-            "First argument of 'def' should be q-expression");
+            "Incorrect first argument type for 'def'. Got %s, expected %s.",
+            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
     // First argument is list of symbols
     lval *names = a->cell[0];
     for (int i = 0; i < names->count; i++) {
@@ -791,9 +823,11 @@ lval* lval_eval(lenv *env, lval *v) {
 
 lval* builtin_eval(lenv *env, lval* a) {
     LASSERT(a, a->count == 1,
-            "Too many arguments for 'eval'. Should be one.");
+            "Wrong number of arguments for 'eval'.  Got %i, expected %i.",
+            a->count, 1);
     LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
-            "Incorrect argument type for 'eval'. Should be q-expression.");
+            "Incorrect first argument type for 'eval'. Got %s, expected %s.",
+            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
 
     lval* x = lval_take(a, 0);
     x->type = LVAL_SEXPRESSION;
@@ -803,7 +837,8 @@ lval* builtin_eval(lenv *env, lval* a) {
 lval* builtin_join(lenv *env, lval* a) {
     for (int i = 0; i < a->count; i++) {
         LASSERT(a, a->cell[i]->type == LVAL_QEXPRESSION,
-                "Incorrect argument type for 'join'. Should be q-expression.");
+            "Incorrect %i argument type for 'join'. Got %s, expected %s.",
+            i + 1, ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
     }
 
     lval* x = lval_pop(a, 0);
