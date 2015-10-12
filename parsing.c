@@ -12,7 +12,19 @@
         lval *err = lval_error(format, ##__VA_ARGS__); \
         lval_delete(args); \
         return err; \
-    }
+    } \
+
+#define LASSERT_ARGUMENT_TYPE(arguments, argument_number, expected_type, function_name) \
+    if ((arguments->cell[argument_number]->type != expected_type)) { \
+        lval *err = lval_error("Incorrect type of argument #%d for '%s'. Got %s, expected %s.", \
+                               argument_number + 1, \
+                               function_name, \
+                               ltype_name(arguments->cell[argument_number]->type), \
+                               ltype_name(expected_type) \
+                               ); \
+        lval_delete(arguments); \
+        return err; \
+    } \
 
 // forward declarations
 struct lval;
@@ -662,9 +674,7 @@ lval* builtin_cons(lenv *env, lval* a) {
     LASSERT(a, a->count == 2,
             "Wrong number of arguments for 'cons'. Got %i, expected %i.",
             a->count, 2);
-    LASSERT(a, a->cell[1]->type == LVAL_QEXPRESSION,
-            "Incorrect second argument type for 'cons'. Got %s, expected %s.",
-            ltype_name(a->cell[1]->type), ltype_name(LVAL_QEXPRESSION));
+    LASSERT_ARGUMENT_TYPE(a, 1, LVAL_QEXPRESSION, "cons");
 
     lval* x = lval_pop(a, 0);
     lval* v = lval_pop(a, 0);
@@ -683,9 +693,7 @@ lval* builtin_init(lenv *env, lval* a) {
     LASSERT(a, a->count == 1,
             "Wrong number of arguments for 'init'.  Got %i, expected %i.",
             a->count, 1);
-    LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
-            "Incorrect first argument type for 'init'. Got %s, expected %s.",
-            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
+    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "init");
     LASSERT(a, a->cell[0]->count != 0,
             "Empty q-expression for 'init'.");
 
@@ -699,9 +707,7 @@ lval* builtin_head(lenv *env, lval* a) {
     LASSERT(a, a->count == 1,
             "Wrong number of arguments for 'head'.  Got %i, expected %i.",
             a->count, 1);
-    LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
-            "Incorrect first argument type for 'head'. Got %s, expected %s.",
-            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
+    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "head");
     LASSERT(a, a->cell[0]->count != 0,
             "Empty q-expression for 'head'.");
 
@@ -717,9 +723,7 @@ lval* builtin_tail(lenv *env, lval* a) {
     LASSERT(a, a->count == 1,
             "Wrong number of arguments for 'tail'.  Got %i, expected %i.",
             a->count, 1);
-    LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
-            "Incorrect first argument type for 'tail'. Got %s, expected %s.",
-            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
+    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "tail");
     LASSERT(a, a->cell[0]->count != 0,
             "Empty q-expression for 'tail'.");
 
@@ -733,9 +737,7 @@ lval* builtin_len(lenv *env, lval* a) {
     LASSERT(a, a->count == 1,
             "Wrong number of arguments for 'len'.  Got %i, expected %i.",
             a->count, 1);
-    LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
-            "Incorrect first argument type for 'len'. Got %s, expected %s.",
-            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
+    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "len");
 
     lval* x = lval_take(a, 0);
     int len = x->count;
@@ -750,9 +752,7 @@ lval* builtin_list(lenv *env, lval* a) {
 }
 
 lval* builtin_def(lenv *env, lval *a) {
-    LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
-            "Incorrect first argument type for 'def'. Got %s, expected %s.",
-            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
+    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "def");
     // First argument is list of symbols
     lval *names = a->cell[0];
     for (int i = 0; i < names->count; i++) {
@@ -826,9 +826,7 @@ lval* builtin_eval(lenv *env, lval* a) {
     LASSERT(a, a->count == 1,
             "Wrong number of arguments for 'eval'.  Got %i, expected %i.",
             a->count, 1);
-    LASSERT(a, a->cell[0]->type == LVAL_QEXPRESSION,
-            "Incorrect first argument type for 'eval'. Got %s, expected %s.",
-            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
+    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "eval");
 
     lval* x = lval_take(a, 0);
     x->type = LVAL_SEXPRESSION;
@@ -837,9 +835,7 @@ lval* builtin_eval(lenv *env, lval* a) {
 
 lval* builtin_join(lenv *env, lval* a) {
     for (int i = 0; i < a->count; i++) {
-        LASSERT(a, a->cell[i]->type == LVAL_QEXPRESSION,
-            "Incorrect %i argument type for 'join'. Got %s, expected %s.",
-            i + 1, ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPRESSION));
+        LASSERT_ARGUMENT_TYPE(a, i, LVAL_QEXPRESSION, "join");
     }
 
     lval* x = lval_pop(a, 0);
