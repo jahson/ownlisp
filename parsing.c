@@ -14,14 +14,23 @@
         return err; \
     } \
 
+#define LASSERT_ARGUMENT_NUMBER(arguments, expected_number, function_name) \
+    if (arguments->count != expected_number) { \
+        lval *err= lval_error("Wrong number of arguments for '%s'. Got %i, expected %i.", \
+                              function_name, \
+                              arguments->count, \
+                              expected_number); \
+        lval_delete(arguments); \
+        return err; \
+    } \
+
 #define LASSERT_ARGUMENT_TYPE(arguments, argument_number, expected_type, function_name) \
     if ((arguments->cell[argument_number]->type != expected_type)) { \
         lval *err = lval_error("Incorrect type of argument #%d for '%s'. Got %s, expected %s.", \
                                argument_number + 1, \
                                function_name, \
                                ltype_name(arguments->cell[argument_number]->type), \
-                               ltype_name(expected_type) \
-                               ); \
+                               ltype_name(expected_type)); \
         lval_delete(arguments); \
         return err; \
     } \
@@ -671,9 +680,7 @@ lval* builtin_max(lenv *env, lval *a) {
 }
 
 lval* builtin_cons(lenv *env, lval* a) {
-    LASSERT(a, a->count == 2,
-            "Wrong number of arguments for 'cons'. Got %i, expected %i.",
-            a->count, 2);
+    LASSERT_ARGUMENT_NUMBER(a, 2, "cons");
     LASSERT_ARGUMENT_TYPE(a, 1, LVAL_QEXPRESSION, "cons");
 
     lval* x = lval_pop(a, 0);
@@ -690,9 +697,7 @@ lval* builtin_cons(lenv *env, lval* a) {
 }
 
 lval* builtin_init(lenv *env, lval* a) {
-    LASSERT(a, a->count == 1,
-            "Wrong number of arguments for 'init'.  Got %i, expected %i.",
-            a->count, 1);
+    LASSERT_ARGUMENT_NUMBER(a, 1, "init");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "init");
     LASSERT(a, a->cell[0]->count != 0,
             "Empty q-expression for 'init'.");
@@ -704,9 +709,7 @@ lval* builtin_init(lenv *env, lval* a) {
 }
 
 lval* builtin_head(lenv *env, lval* a) {
-    LASSERT(a, a->count == 1,
-            "Wrong number of arguments for 'head'.  Got %i, expected %i.",
-            a->count, 1);
+    LASSERT_ARGUMENT_NUMBER(a, 1, "head");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "head");
     LASSERT(a, a->cell[0]->count != 0,
             "Empty q-expression for 'head'.");
@@ -720,9 +723,7 @@ lval* builtin_head(lenv *env, lval* a) {
 }
 
 lval* builtin_tail(lenv *env, lval* a) {
-    LASSERT(a, a->count == 1,
-            "Wrong number of arguments for 'tail'.  Got %i, expected %i.",
-            a->count, 1);
+    LASSERT_ARGUMENT_NUMBER(a, 1, "tail");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "tail");
     LASSERT(a, a->cell[0]->count != 0,
             "Empty q-expression for 'tail'.");
@@ -734,9 +735,7 @@ lval* builtin_tail(lenv *env, lval* a) {
 }
 
 lval* builtin_len(lenv *env, lval* a) {
-    LASSERT(a, a->count == 1,
-            "Wrong number of arguments for 'len'.  Got %i, expected %i.",
-            a->count, 1);
+    LASSERT_ARGUMENT_NUMBER(a, 1, "len");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "len");
 
     lval* x = lval_take(a, 0);
@@ -823,9 +822,7 @@ lval* lval_eval(lenv *env, lval *v) {
 }
 
 lval* builtin_eval(lenv *env, lval* a) {
-    LASSERT(a, a->count == 1,
-            "Wrong number of arguments for 'eval'.  Got %i, expected %i.",
-            a->count, 1);
+    LASSERT_ARGUMENT_NUMBER(a, 1, "eval");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "eval");
 
     lval* x = lval_take(a, 0);
