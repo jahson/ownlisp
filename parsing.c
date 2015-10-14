@@ -14,6 +14,13 @@
         return err; \
     } \
 
+#define LASSERT_NOT_EMPTY_QEXPR(arguments, function_name) \
+    if (arguments->cell[0]->count == 0) { \
+        lval *err = lval_error("Empty Q-Expression for '%s'.", function_name); \
+        lval_delete(arguments); \
+        return err; \
+    } \
+
 #define LASSERT_ARGUMENT_NUMBER(arguments, expected_number, function_name) \
     if (arguments->count != expected_number) { \
         lval *err= lval_error("Wrong number of arguments for '%s'. Got %i, expected %i.", \
@@ -699,8 +706,7 @@ lval* builtin_cons(lenv *env, lval* a) {
 lval* builtin_init(lenv *env, lval* a) {
     LASSERT_ARGUMENT_NUMBER(a, 1, "init");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "init");
-    LASSERT(a, a->cell[0]->count != 0,
-            "Empty q-expression for 'init'.");
+    LASSERT_NOT_EMPTY_QEXPR(a, "init");
 
     lval* v = lval_take(a, 0);
     // delete last element and return
@@ -711,8 +717,7 @@ lval* builtin_init(lenv *env, lval* a) {
 lval* builtin_head(lenv *env, lval* a) {
     LASSERT_ARGUMENT_NUMBER(a, 1, "head");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "head");
-    LASSERT(a, a->cell[0]->count != 0,
-            "Empty q-expression for 'head'.");
+    LASSERT_NOT_EMPTY_QEXPR(a, "head");
 
     lval* v = lval_take(a, 0);
     // delete all elements that are not head and return
@@ -725,8 +730,7 @@ lval* builtin_head(lenv *env, lval* a) {
 lval* builtin_tail(lenv *env, lval* a) {
     LASSERT_ARGUMENT_NUMBER(a, 1, "tail");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "tail");
-    LASSERT(a, a->cell[0]->count != 0,
-            "Empty q-expression for 'tail'.");
+    LASSERT_NOT_EMPTY_QEXPR(a, "tail");
 
     lval* v = lval_take(a, 0);
     // delete first element and return
