@@ -7,6 +7,8 @@
 
 #include <editline/readline.h>
 
+#define STR_EQ(A, B) (strcmp(A, B) == 0)
+
 #define LASSERT(args, cond, format, ...) \
     if (!(cond)) { \
         lval *err = lval_error(format, ##__VA_ARGS__); \
@@ -197,7 +199,7 @@ lval* lval_error(char* format, ...) {
 
 lval* lenv_get(lenv* env, lval *key) {
     for (int i = 0; i < env->count; i++) {
-        if (strcmp(env->names[i], key->val.symbol) == 0) {
+        if STR_EQ(env->names[i], key->val.symbol) {
             return lval_copy(env->values[i]);
         }
     }
@@ -207,7 +209,7 @@ lval* lenv_get(lenv* env, lval *key) {
 void lenv_put(lenv *env, lval *key, lval *value) {
     // replace existing variables
     for (int i = 0; i < env->count; i++) {
-        if (strcmp(env->names[i], key->val.symbol) == 0) {
+        if STR_EQ(env->names[i], key->val.symbol) {
             lval_delete(env->values[i]);
             env->values[i] = lval_copy(value);
             return;
@@ -303,27 +305,26 @@ lval* lval_read(mpc_ast_t* t) {
 
     // if root or sexpr then create empty list
     lval* x = NULL;
-    if (
-        strcmp(t->tag, ">") == 0 ||
-        strstr(t->tag, "sexpr")
-        ) {
+    if STR_EQ(t->tag, ">") {
         x = lval_sexpression();
     }
+
+    if (strstr(t->tag, "sexpr")) {
+        x = lval_sexpression();
+    }
+
     if (strstr(t->tag, "qexpr")) {
         x = lval_qepression();
     }
 
     // fill the list with any valid expression contained within
     for (int i = 0; i < t->children_num; i++) {
-        if (
-            strcmp(t->children[i]->contents, "(") == 0 ||
-            strcmp(t->children[i]->contents, ")") == 0 ||
-            strcmp(t->children[i]->contents, "{") == 0 ||
-            strcmp(t->children[i]->contents, "}") == 0 ||
-            strcmp(t->children[i]->tag, "regex") == 0
-           ) {
-            continue;
-        }
+        if STR_EQ(t->children[i]->contents, "(") { continue; }
+        if STR_EQ(t->children[i]->contents, ")") { continue; }
+        if STR_EQ(t->children[i]->contents, "{") { continue; }
+        if STR_EQ(t->children[i]->contents, "}") { continue; }
+        if STR_EQ(t->children[i]->tag, "regex") { continue; }
+
         x = lval_add(x, lval_read(t->children[i]));
     }
 
@@ -416,7 +417,7 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
     lval* x = lval_pop(a, 0);
 
     // unary negation
-    if ((strcmp(operator, "-") == 0) && a->count == 0) {
+    if (STR_EQ(operator, "-") && a->count == 0) {
         switch(x->type) {
             case LVAL_INTEGER:
                 x->val.integer = -x->val.integer;
@@ -430,7 +431,7 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
     while (a->count > 0) {
         lval* y = lval_pop(a, 0);
 
-        if (strcmp(operator, "+") == 0 || strcmp(operator, "add") == 0) {
+        if (STR_EQ(operator, "+") || STR_EQ(operator, "add")) {
             if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
                 x->val.decimal += y->val.decimal;
             } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
@@ -442,7 +443,7 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
             }
         }
 
-        if (strcmp(operator, "-") == 0 || strcmp(operator, "sub") == 0) {
+        if (STR_EQ(operator, "-") || STR_EQ(operator, "sub")) {
             if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
                 x->val.decimal -= y->val.decimal;
             } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
@@ -454,7 +455,7 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
             }
         }
 
-        if (strcmp(operator, "*") == 0 || strcmp(operator, "mul") == 0) {
+        if (STR_EQ(operator, "*") || STR_EQ(operator, "mul")) {
             if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
                 x->val.decimal *= y->val.decimal;
             } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
@@ -466,7 +467,7 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
             }
         }
 
-        if (strcmp(operator, "/") == 0 || strcmp(operator, "div") == 0) {
+        if (STR_EQ(operator, "/") || STR_EQ(operator, "div")) {
             switch (y->type) {
                 case LVAL_DECIMAL:
                     if (y->val.decimal == 0.0) {
@@ -497,7 +498,7 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
             }
         }
 
-        if (strcmp(operator, "%") == 0 || strcmp(operator, "mod") == 0) {
+        if (STR_EQ(operator, "%") || STR_EQ(operator, "mod")) {
             switch (y->type) {
                 case LVAL_DECIMAL:
                     if (y->val.decimal == 0.0) {
@@ -528,7 +529,7 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
             }
         }
 
-        if (strcmp(operator, "^") == 0) {
+        if (STR_EQ(operator, "^")) {
             if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
                 x->val.decimal = pow(x->val.decimal, y->val.decimal);
             } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
@@ -540,7 +541,7 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
             }
         }
 
-        if (strcmp(operator, "min") == 0) {
+        if (STR_EQ(operator, "min")) {
             if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
                 x->val.decimal = x->val.decimal < y->val.decimal
                     ? x->val.decimal
@@ -559,7 +560,7 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
                     : y->val.integer;
             }
         }
-        if (strcmp(operator, "max") == 0) {
+        if (STR_EQ(operator, "max")) {
             if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
                 x->val.decimal = x->val.decimal > y->val.decimal
                     ? x->val.decimal
