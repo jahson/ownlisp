@@ -847,6 +847,9 @@ lval* builtin_join(lenv *env, lval* a) {
     return x;
 }
 
+lval* builtin_exit(lenv *env, lval *a) {
+    exit(0);
+}
 
 void lenv_add_builtin(lenv *env, char *name, lbuiltin fn) {
     lval *key = lval_symbol(name);
@@ -876,9 +879,12 @@ void lenv_add_builtins(lenv *env) {
     lenv_add_builtin(env, "/", builtin_div);
     lenv_add_builtin(env, "%", builtin_div);
     lenv_add_builtin(env, "^", builtin_pow);
-    
+
     /* Variable Functions */
     lenv_add_builtin(env, "def", builtin_def);
+
+    /* Other */
+    lenv_add_builtin(env, "exit", builtin_exit);
 }
 
 int main(int argc, char** argv) {
