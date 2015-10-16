@@ -7,7 +7,23 @@
 
 #include <editline/readline.h>
 
-#define STR_EQ(A, B) (strcmp(A, B) == 0)
+#define STR_EQ(A, B) (strcmp((A), (B)) == 0)
+#define STR_CONTAIN(A, B) (strstr((A), (B)) == 0)
+
+// accessors
+#define L_COUNT(lval)    (lval)->count
+#define L_CELL(lval)     (lval)->cell
+#define L_TYPE(lval)     (lval)->type
+#define L_FUNCTION(lval) (lval)->val.fn
+#define L_INTEGER(lval)  (lval)->val.integer
+#define L_DECIMAL(lval)  (lval)->val.decimal
+#define L_ERROR(lval)    (lval)->val.error
+#define L_SYMBOL(lval)   (lval)->val.symbol
+#define L_CELL_N(lval, n) (lval)->cell[(n)]
+#define L_TYPE_N(lval, n) L_CELL_N(lval, n)->type
+
+// loop
+#define L_FOREACH(i, e) for (int i = 0, lim = L_COUNT(e); i < lim; ++i)
 
 #define LASSERT(args, cond, format, ...) \
     if (!(cond)) { \
@@ -17,28 +33,28 @@
     } \
 
 #define LASSERT_NOT_EMPTY_QEXPR(arguments, function_name) \
-    if (arguments->cell[0]->count == 0) { \
+    if (L_COUNT(L_CELL_N(arguments, 0)) == 0) { \
         lval *err = lval_error("Empty Q-Expression for '%s'.", function_name); \
         lval_delete(arguments); \
         return err; \
     } \
 
 #define LASSERT_ARGUMENT_NUMBER(arguments, expected_number, function_name) \
-    if (arguments->count != expected_number) { \
+    if (L_COUNT(arguments) != expected_number) { \
         lval *err= lval_error("Wrong number of arguments for '%s'. Got %i, expected %i.", \
                               function_name, \
-                              arguments->count, \
+                              L_COUNT(arguments), \
                               expected_number); \
         lval_delete(arguments); \
         return err; \
     } \
 
 #define LASSERT_ARGUMENT_TYPE(arguments, argument_number, expected_type, function_name) \
-    if ((arguments->cell[argument_number]->type != expected_type)) { \
+    if ((L_TYPE(arguments->cell[argument_number]) != expected_type)) { \
         lval *err = lval_error("Incorrect type of argument #%d for '%s'. Got %s, expected %s.", \
                                argument_number + 1, \
                                function_name, \
-                               ltype_name(arguments->cell[argument_number]->type), \
+                               ltype_name(L_TYPE(arguments->cell[argument_number])), \
                                ltype_name(expected_type)); \
         lval_delete(arguments); \
         return err; \
@@ -105,27 +121,27 @@ lenv *lenv_new(void) {
 }
 
 void lval_delete(lval* v) {
-    switch (v->type) {
+    switch (L_TYPE(v)) {
         case LVAL_INTEGER:
         case LVAL_DECIMAL:
             break;
 
         case LVAL_ERROR:
-            free(v->val.error);
+            free(L_ERROR(v));
             break;
 
         case LVAL_SYMBOL:
-            free(v->val.symbol);
+            free(L_SYMBOL(v));
             break;
 
         case LVAL_QEXPRESSION:
         case LVAL_SEXPRESSION:
             // free memory for all elements inside
-            for (int i = 0; i < v->count; i++) {
-                lval_delete(v->cell[i]);
+            L_FOREACH(i, v) {
+                lval_delete(L_CELL_N(v, i));
             }
             // free memory allocated to contain the pointers
-            free(v->cell);
+            free(L_CELL(v));
             break;
         case LVAL_FUNCTION:
             break;
@@ -147,32 +163,32 @@ void lenv_delete(lenv *env) {
 
 lval* lval_copy(lval *a) {
     lval *x = malloc(sizeof(lval));
-    x->type = a->type;
+    L_TYPE(x) = L_TYPE(a);
 
-    switch (a->type) {
+    switch (L_TYPE(a)) {
         case LVAL_FUNCTION:
-            x->val.fn = a->val.fn;
+            L_FUNCTION(x) = L_FUNCTION(a);
             break;
         case LVAL_INTEGER:
-            x->val.integer = a->val.integer;
+            L_INTEGER(x) = L_INTEGER(a);
             break;
         case LVAL_DECIMAL:
-            x->val.decimal = a->val.decimal;
+            L_DECIMAL(x) = L_DECIMAL(a);
             break;
         case LVAL_ERROR:
-            x->val.error = malloc(strlen(a->val.error) + 1);
-            strcpy(x->val.error, a->val.error);
+            L_ERROR(x) = malloc(strlen(L_ERROR(a)) + 1);
+            strcpy(L_ERROR(x), L_ERROR(a));
             break;
         case LVAL_SYMBOL:
-            x->val.symbol = malloc(strlen(a->val.symbol) + 1);
-            strcpy(x->val.symbol, a->val.symbol);
+            L_SYMBOL(x) = malloc(strlen(L_SYMBOL(a)) + 1);
+            strcpy(L_SYMBOL(x), L_SYMBOL(a));
             break;
         case LVAL_SEXPRESSION:
         case LVAL_QEXPRESSION:
-            x->count = a->count;
-            x->cell = malloc(sizeof(lval*) * x->count);
-            for (int i = 0; i < x->count; i++) {
-                x->cell[i] = lval_copy(a->cell[i]);
+            L_COUNT(x) = L_COUNT(a);
+            L_CELL(x) = malloc(sizeof(lval*) * L_COUNT(x));
+            L_FOREACH(i, x) {
+                L_CELL_N(x, i) = lval_copy(L_CELL_N(a, i));
             }
             break;
     }
@@ -181,16 +197,16 @@ lval* lval_copy(lval *a) {
 
 lval* lval_error(char* format, ...) {
     lval* v = malloc(sizeof(lval));
-    v->type = LVAL_ERROR;
+    L_TYPE(v) = LVAL_ERROR;
 
     va_list va;
     va_start(va, format);
 
-    v->val.error = malloc(512);
+    L_ERROR(v) = malloc(512);
 
-    vsnprintf(v->val.error, 511, format, va);
+    vsnprintf(L_ERROR(v), 511, format, va);
 
-    v->val.error = realloc(v->val.error, strlen(v->val.error) + 1);
+    L_ERROR(v) = realloc(L_ERROR(v), strlen(L_ERROR(v)) + 1);
 
     va_end(va);
 
@@ -199,17 +215,17 @@ lval* lval_error(char* format, ...) {
 
 lval* lenv_get(lenv* env, lval *key) {
     for (int i = 0; i < env->count; i++) {
-        if STR_EQ(env->names[i], key->val.symbol) {
+        if (STR_EQ(env->names[i], L_SYMBOL(key))) {
             return lval_copy(env->values[i]);
         }
     }
-    return lval_error("Unbound symbol '%s'", key->val.symbol);
+    return lval_error("Unbound symbol '%s'", L_SYMBOL(key));
 }
 
 void lenv_put(lenv *env, lval *key, lval *value) {
     // replace existing variables
     for (int i = 0; i < env->count; i++) {
-        if STR_EQ(env->names[i], key->val.symbol) {
+        if (STR_EQ(env->names[i], L_SYMBOL(key))) {
             lval_delete(env->values[i]);
             env->values[i] = lval_copy(value);
             return;
@@ -221,65 +237,65 @@ void lenv_put(lenv *env, lval *key, lval *value) {
     env->names = realloc(env->names, sizeof(char*) * env->count);
 
     env->values[env->count - 1] = lval_copy(value);
-    env->names[env->count - 1] = malloc(strlen(key->val.symbol) + 1);
-    strcpy(env->names[env->count - 1], key->val.symbol);
+    env->names[env->count - 1] = malloc(strlen(L_SYMBOL(key)) + 1);
+    strcpy(env->names[env->count - 1], L_SYMBOL(key));
 }
 
 lval* lval_function(lbuiltin fn) {
     lval* v = malloc(sizeof(lval));
-    v->type = LVAL_FUNCTION;
-    v->val.fn = fn;
+    L_TYPE(v) = LVAL_FUNCTION;
+    L_FUNCTION(v) = fn;
     return v;
 }
 
 lval* lval_qepression(void) {
     lval* v = malloc(sizeof(lval));
-    v->type = LVAL_QEXPRESSION;
-    v->count = 0;
-    v->cell = NULL;
+    L_TYPE(v) = LVAL_QEXPRESSION;
+    L_COUNT(v) = 0;
+    L_CELL(v) = NULL;
     return v;
 }
 
 lval* lval_integer(long x) {
     lval* v = malloc(sizeof(lval));
-    v->type = LVAL_INTEGER;
-    v->val.integer = x;
+    L_TYPE(v) = LVAL_INTEGER;
+    L_INTEGER(v) = x;
     return v;
 }
 
 lval* lval_decimal(double x) {
     lval* v = malloc(sizeof(lval));
-    v->type = LVAL_DECIMAL;
-    v->val.decimal = x;
+    L_TYPE(v) = LVAL_DECIMAL;
+    L_DECIMAL(v) = x;
     return v;
 }
 
 lval* lval_symbol(char* m) {
     lval* v = malloc(sizeof(lval));
-    v->type = LVAL_SYMBOL;
-    v->val.symbol = malloc(strlen(m) + 1);
-    strcpy(v->val.error, m);
+    L_TYPE(v) = LVAL_SYMBOL;
+    L_SYMBOL(v) = malloc(strlen(m) + 1);
+    strcpy(L_ERROR(v), m);
     return v;
 }
 
 lval* lval_sexpression(void) {
     lval* v = malloc(sizeof(lval));
-    v->type = LVAL_SEXPRESSION;
-    v->count = 0;
-    v->cell = NULL;
+    L_TYPE(v) = LVAL_SEXPRESSION;
+    L_COUNT(v) = 0;
+    L_CELL(v) = NULL;
     return v;
 }
 
 
 lval* lval_read_number(mpc_ast_t* t) {
     errno = 0;
-    if (strstr(t->tag, "integer")) {
+    if (STR_CONTAIN(t->tag, "integer")) {
         long x = strtol(t->contents, NULL, 10);
         return errno != ERANGE
             ? lval_integer(x)
             : lval_error("Invalid integer");
     }
-    if (strstr(t->tag, "decimal")) {
+    if (STR_CONTAIN(t->tag, "decimal")) {
         double x = strtod(t->contents, NULL);
         return errno != ERANGE
             ? lval_decimal(x)
@@ -289,41 +305,41 @@ lval* lval_read_number(mpc_ast_t* t) {
 }
 
 lval* lval_add(lval* v, lval* x) {
-    v->count++;
-    v->cell = realloc(v->cell, sizeof(lval*) * v->count);
-    v->cell[v->count - 1] = x;
+    L_COUNT(v)++;
+    L_CELL(v) = realloc(L_CELL(v), sizeof(lval*) * L_COUNT(v));
+    v->cell[L_COUNT(v) - 1] = x;
     return v;
 }
 
 lval* lval_read(mpc_ast_t* t) {
-    if (strstr(t->tag, "number")) {
+    if (STR_CONTAIN(t->tag, "number")) {
         return lval_read_number(t);
     }
-    if (strstr(t->tag, "symbol")) {
+    if (STR_CONTAIN(t->tag, "symbol")) {
         return lval_symbol(t->contents);
     }
 
     // if root or sexpr then create empty list
     lval* x = NULL;
-    if STR_EQ(t->tag, ">") {
+    if (STR_EQ(t->tag, ">")) {
         x = lval_sexpression();
     }
 
-    if (strstr(t->tag, "sexpr")) {
+    if (STR_CONTAIN(t->tag, "sexpr")) {
         x = lval_sexpression();
     }
 
-    if (strstr(t->tag, "qexpr")) {
+    if (STR_CONTAIN(t->tag, "qexpr")) {
         x = lval_qepression();
     }
 
     // fill the list with any valid expression contained within
     for (int i = 0; i < t->children_num; i++) {
-        if STR_EQ(t->children[i]->contents, "(") { continue; }
-        if STR_EQ(t->children[i]->contents, ")") { continue; }
-        if STR_EQ(t->children[i]->contents, "{") { continue; }
-        if STR_EQ(t->children[i]->contents, "}") { continue; }
-        if STR_EQ(t->children[i]->tag, "regex") { continue; }
+        if (STR_EQ(t->children[i]->contents, "(")) { continue; }
+        if (STR_EQ(t->children[i]->contents, ")")) { continue; }
+        if (STR_EQ(t->children[i]->contents, "{")) { continue; }
+        if (STR_EQ(t->children[i]->contents, "}")) { continue; }
+        if (STR_EQ(t->children[i]->tag, "regex")) { continue; }
 
         x = lval_add(x, lval_read(t->children[i]));
     }
@@ -335,12 +351,12 @@ lval* lval_read(mpc_ast_t* t) {
 void lval_print(lval* v); // forward declare to use in 'lval_expr_print'
 void lval_expr_print(lval* v, char open, char close) {
     putchar(open);
-    for (int i = 0; i < v->count; i++) {
+    L_FOREACH(i, v) {
         // print value contained within
-        lval_print(v->cell[i]);
+        lval_print(L_CELL_N(v, i));
 
         // don't print trailing space if last element
-        if (i != (v->count - 1)) {
+        if (i != (L_COUNT(v) - 1)) {
             putchar(' ');
         }
     }
@@ -348,15 +364,15 @@ void lval_expr_print(lval* v, char open, char close) {
 }
 
 void lval_print(lval* v) {
-    switch (v->type) {
+    switch (L_TYPE(v)) {
         case LVAL_INTEGER:
-            printf("%li", v->val.integer);
+            printf("%li", L_INTEGER(v));
             break;
         case LVAL_DECIMAL:
-            printf("%f", v->val.decimal);
+            printf("%f", L_DECIMAL(v));
             break;
         case LVAL_SYMBOL:
-            printf("%s", v->val.symbol);
+            printf("%s", L_SYMBOL(v));
             break;
         case LVAL_SEXPRESSION:
             lval_expr_print(v, '(', ')');
@@ -365,13 +381,13 @@ void lval_print(lval* v) {
             lval_expr_print(v, '{', '}');
             break;
         case LVAL_ERROR:
-            printf("Error: %s", v->val.error);
+            printf("Error: %s", L_ERROR(v));
             break;
         case LVAL_FUNCTION:
             printf("<function>");
             break;
         default:
-            printf("Error: Unknown value type %d", v->type);
+            printf("Error: Unknown value type %d", L_TYPE(v));
             break;
     }
 }
@@ -382,12 +398,12 @@ void lval_println(lval* v) {
 }
 
 lval* lval_pop(lval* v, int i) {
-    lval* x = v->cell[i];
+    lval* x = L_CELL_N(v, i);
 
     // shift memory after the item at 'i' over the top and reallocate memory used
-    memmove(&v->cell[i], &v->cell[i + 1], sizeof(lval*) * (v->count - i - 1));
-    v->count--;
-    v->cell = realloc(v->cell, sizeof(lval*) * v->count);
+    memmove(&L_CELL_N(v, i), &v->cell[i + 1], sizeof(lval*) * (L_COUNT(v) - i - 1));
+    L_COUNT(v)--;
+    L_CELL(v) = realloc(L_CELL(v), sizeof(lval*) * L_COUNT(v));
 
     return x;
 }
@@ -399,7 +415,7 @@ lval* lval_take(lval* v, int i) {
 }
 
 lval* lval_join(lval* x, lval* y) {
-    while (y->count) {
+    while (L_COUNT(y)) {
         x = lval_add(x, lval_pop(y, 0));
     }
     lval_delete(y);
@@ -407,8 +423,8 @@ lval* lval_join(lval* x, lval* y) {
 }
 
 lval* builtin_op(char *operator, lenv *env, lval *a) {
-    for (int i = 0; i < a->count; i++) {
-        if (a->cell[i]->type != LVAL_INTEGER && a->cell[i]->type != LVAL_DECIMAL) {
+    L_FOREACH(i, a) {
+        if (L_TYPE_N(a, i) != LVAL_INTEGER && L_TYPE_N(a, i) != LVAL_DECIMAL) {
             lval_delete(a);
             return lval_error("Cannot operate on non-number");
         }
@@ -417,60 +433,60 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
     lval* x = lval_pop(a, 0);
 
     // unary negation
-    if (STR_EQ(operator, "-") && a->count == 0) {
-        switch(x->type) {
+    if (STR_EQ(operator, "-") && L_COUNT(a) == 0) {
+        switch(L_TYPE(x)) {
             case LVAL_INTEGER:
-                x->val.integer = -x->val.integer;
+                L_INTEGER(x) = -L_INTEGER(x);
                 break;
             case LVAL_DECIMAL:
-                x->val.decimal = -x->val.decimal;
+                L_DECIMAL(x) = -L_DECIMAL(x);
                 break;
         }
     }
 
-    while (a->count > 0) {
+    while (L_COUNT(a) > 0) {
         lval* y = lval_pop(a, 0);
 
         if (STR_EQ(operator, "+") || STR_EQ(operator, "add")) {
-            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-                x->val.decimal += y->val.decimal;
-            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-                x->val.decimal += y->val.integer;
-            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-                x->val.integer += (int)y->val.decimal;
+            if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_DECIMAL) {
+                L_DECIMAL(x) += L_DECIMAL(y);
+            } else if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_INTEGER) {
+                L_DECIMAL(x) += L_INTEGER(y);
+            } else if (L_TYPE(x) == LVAL_INTEGER && L_TYPE(y) == LVAL_DECIMAL) {
+                L_INTEGER(x) += (int)L_DECIMAL(y);
             } else {
-                x->val.integer += y->val.integer;
+                L_INTEGER(x) += L_INTEGER(y);
             }
         }
 
         if (STR_EQ(operator, "-") || STR_EQ(operator, "sub")) {
-            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-                x->val.decimal -= y->val.decimal;
-            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-                x->val.decimal -= y->val.integer;
-            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-                x->val.integer -= (int)y->val.decimal;
+            if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_DECIMAL) {
+                L_DECIMAL(x) -= L_DECIMAL(y);
+            } else if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_INTEGER) {
+                L_DECIMAL(x) -= L_INTEGER(y);
+            } else if (L_TYPE(x) == LVAL_INTEGER && L_TYPE(y) == LVAL_DECIMAL) {
+                L_INTEGER(x) -= (int)L_DECIMAL(y);
             } else {
-                x->val.integer -= y->val.integer;
+                L_INTEGER(x) -= L_INTEGER(y);
             }
         }
 
         if (STR_EQ(operator, "*") || STR_EQ(operator, "mul")) {
-            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-                x->val.decimal *= y->val.decimal;
-            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-                x->val.decimal *= y->val.integer;
-            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-                x->val.integer *= (int)y->val.decimal;
+            if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_DECIMAL) {
+                L_DECIMAL(x) *= L_DECIMAL(y);
+            } else if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_INTEGER) {
+                L_DECIMAL(x) *= L_INTEGER(y);
+            } else if (L_TYPE(x) == LVAL_INTEGER && L_TYPE(y) == LVAL_DECIMAL) {
+                L_INTEGER(x) *= (int)L_DECIMAL(y);
             } else {
-                x->val.integer *= y->val.integer;
+                L_INTEGER(x) *= L_INTEGER(y);
             }
         }
 
         if (STR_EQ(operator, "/") || STR_EQ(operator, "div")) {
-            switch (y->type) {
+            switch (L_TYPE(y)) {
                 case LVAL_DECIMAL:
-                    if (y->val.decimal == 0.0) {
+                    if (L_DECIMAL(y) == 0.0) {
                         lval_delete(x);
                         lval_delete(y);
                         lval_delete(a);
@@ -478,7 +494,7 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
                     }
                     break;
                 case LVAL_INTEGER:
-                    if (y->val.integer == 0) {
+                    if (L_INTEGER(y) == 0) {
                         lval_delete(x);
                         lval_delete(y);
                         lval_delete(a);
@@ -487,21 +503,21 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
                     break;
             }
 
-            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-                x->val.decimal /= y->val.decimal;
-            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-                x->val.decimal /= y->val.integer;
-            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-                x->val.integer /= y->val.decimal;
+            if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_DECIMAL) {
+                L_DECIMAL(x) /= L_DECIMAL(y);
+            } else if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_INTEGER) {
+                L_DECIMAL(x) /= L_INTEGER(y);
+            } else if (L_TYPE(x) == LVAL_INTEGER && L_TYPE(y) == LVAL_DECIMAL) {
+                L_INTEGER(x) /= L_DECIMAL(y);
             } else {
-                x->val.integer /= y->val.integer;
+                L_INTEGER(x) /= L_INTEGER(y);
             }
         }
 
         if (STR_EQ(operator, "%") || STR_EQ(operator, "mod")) {
-            switch (y->type) {
+            switch (L_TYPE(y)) {
                 case LVAL_DECIMAL:
-                    if (y->val.decimal == 0.0) {
+                    if (L_DECIMAL(y) == 0.0) {
                         lval_delete(x);
                         lval_delete(y);
                         lval_delete(a);
@@ -509,7 +525,7 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
                     }
                     break;
                 case LVAL_INTEGER:
-                    if (y->val.integer == 0) {
+                    if (L_INTEGER(y) == 0) {
                         lval_delete(x);
                         lval_delete(y);
                         lval_delete(a);
@@ -518,65 +534,65 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
                     break;
             }
 
-            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-                x->val.decimal = fmod(x->val.decimal, y->val.decimal);
-            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-                x->val.decimal = fmod(x->val.decimal, y->val.integer);
-            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-                x->val.integer = fmod(x->val.integer, (int)y->val.decimal);
+            if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_DECIMAL) {
+                L_DECIMAL(x) = fmod(L_DECIMAL(x), L_DECIMAL(y));
+            } else if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_INTEGER) {
+                L_DECIMAL(x) = fmod(L_DECIMAL(x), L_INTEGER(y));
+            } else if (L_TYPE(x) == LVAL_INTEGER && L_TYPE(y) == LVAL_DECIMAL) {
+                L_INTEGER(x) = fmod(L_INTEGER(x), (int)L_DECIMAL(y));
             } else {
-                x->val.integer = (int)fmod(x->val.integer, y->val.integer);
+                L_INTEGER(x) = (int)fmod(L_INTEGER(x), L_INTEGER(y));
             }
         }
 
         if (STR_EQ(operator, "^")) {
-            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-                x->val.decimal = pow(x->val.decimal, y->val.decimal);
-            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-                x->val.decimal = pow(x->val.decimal, y->val.integer);
-            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-                x->val.integer = (int)pow(x->val.integer, y->val.decimal);
+            if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_DECIMAL) {
+                L_DECIMAL(x) = pow(L_DECIMAL(x), L_DECIMAL(y));
+            } else if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_INTEGER) {
+                L_DECIMAL(x) = pow(L_DECIMAL(x), L_INTEGER(y));
+            } else if (L_TYPE(x) == LVAL_INTEGER && L_TYPE(y) == LVAL_DECIMAL) {
+                L_INTEGER(x) = (int)pow(L_INTEGER(x), L_DECIMAL(y));
             } else {
-                x->val.integer = pow(x->val.integer, y->val.integer);
+                L_INTEGER(x) = pow(L_INTEGER(x), L_INTEGER(y));
             }
         }
 
         if (STR_EQ(operator, "min")) {
-            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-                x->val.decimal = x->val.decimal < y->val.decimal
-                    ? x->val.decimal
-                    : y->val.decimal;
-            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-                x->val.decimal = x->val.decimal < y->val.integer
-                    ? x->val.decimal
-                    : (double)y->val.integer;
-            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-                x->val.integer = x->val.integer < y->val.decimal
-                    ? x->val.integer
-                    : (int)y->val.decimal;
+            if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_DECIMAL) {
+                L_DECIMAL(x) = L_DECIMAL(x) < L_DECIMAL(y)
+                    ? L_DECIMAL(x)
+                    : L_DECIMAL(y);
+            } else if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_INTEGER) {
+                L_DECIMAL(x) = L_DECIMAL(x) < L_INTEGER(y)
+                    ? L_DECIMAL(x)
+                    : (double)L_INTEGER(y);
+            } else if (L_TYPE(x) == LVAL_INTEGER && L_TYPE(y) == LVAL_DECIMAL) {
+                L_INTEGER(x) = L_INTEGER(x) < L_DECIMAL(y)
+                    ? L_INTEGER(x)
+                    : (int)L_DECIMAL(y);
             } else {
-                x->val.integer = x->val.integer < y->val.integer
-                    ? x->val.integer
-                    : y->val.integer;
+                L_INTEGER(x) = L_INTEGER(x) < L_INTEGER(y)
+                    ? L_INTEGER(x)
+                    : L_INTEGER(y);
             }
         }
         if (STR_EQ(operator, "max")) {
-            if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-                x->val.decimal = x->val.decimal > y->val.decimal
-                    ? x->val.decimal
-                    : y->val.decimal;
-            } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-                x->val.decimal = x->val.decimal > y->val.integer
-                    ? x->val.decimal
-                    : (double)y->val.integer;
-            } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-                x->val.integer = x->val.integer > y->val.decimal
-                    ? x->val.integer
-                    : (int)y->val.decimal;
+            if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_DECIMAL) {
+                L_DECIMAL(x) = L_DECIMAL(x) > L_DECIMAL(y)
+                    ? L_DECIMAL(x)
+                    : L_DECIMAL(y);
+            } else if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_INTEGER) {
+                L_DECIMAL(x) = L_DECIMAL(x) > L_INTEGER(y)
+                    ? L_DECIMAL(x)
+                    : (double)L_INTEGER(y);
+            } else if (L_TYPE(x) == LVAL_INTEGER && L_TYPE(y) == LVAL_DECIMAL) {
+                L_INTEGER(x) = L_INTEGER(x) > L_DECIMAL(y)
+                    ? L_INTEGER(x)
+                    : (int)L_DECIMAL(y);
             } else {
-                x->val.integer = x->val.integer > y->val.integer
-                    ? x->val.integer
-                    : y->val.integer;
+                L_INTEGER(x) = L_INTEGER(x) > L_INTEGER(y)
+                    ? L_INTEGER(x)
+                    : L_INTEGER(y);
             }
         }
 
@@ -612,8 +628,8 @@ lval* builtin_pow(lenv *env, lval *a) {
 }
 
 lval* builtin_min(lenv *env, lval *a) {
-    for (int i = 0; i < a->count; i++) {
-        if (a->cell[i]->type != LVAL_INTEGER && a->cell[i]->type != LVAL_DECIMAL) {
+    L_FOREACH(i, a) {
+        if (L_TYPE_N(a, i) != LVAL_INTEGER && L_TYPE_N(a, i) != LVAL_DECIMAL) {
             lval_delete(a);
             return lval_error("Cannot operate on non-number");
         }
@@ -621,25 +637,25 @@ lval* builtin_min(lenv *env, lval *a) {
 
     lval* x = lval_pop(a, 0);
 
-    while (a->count > 0) {
+    while (L_COUNT(a) > 0) {
         lval* y = lval_pop(a, 0);
 
-        if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-            x->val.decimal = x->val.decimal < y->val.decimal
-                ? x->val.decimal
-                : y->val.decimal;
-        } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-            x->val.decimal = x->val.decimal < y->val.integer
-                ? x->val.decimal
-                : (double)y->val.integer;
-        } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-            x->val.integer = x->val.integer < y->val.decimal
-                ? x->val.integer
-                : (int)y->val.decimal;
+        if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_DECIMAL) {
+            L_DECIMAL(x) = L_DECIMAL(x) < L_DECIMAL(y)
+                ? L_DECIMAL(x)
+                : L_DECIMAL(y);
+        } else if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_INTEGER) {
+            L_DECIMAL(x) = L_DECIMAL(x) < L_INTEGER(y)
+                ? L_DECIMAL(x)
+                : (double)L_INTEGER(y);
+        } else if (L_TYPE(x) == LVAL_INTEGER && L_TYPE(y) == LVAL_DECIMAL) {
+            L_INTEGER(x) = L_INTEGER(x) < L_DECIMAL(y)
+                ? L_INTEGER(x)
+                : (int)L_DECIMAL(y);
         } else {
-            x->val.integer = x->val.integer < y->val.integer
-                ? x->val.integer
-                : y->val.integer;
+            L_INTEGER(x) = L_INTEGER(x) < L_INTEGER(y)
+                ? L_INTEGER(x)
+                : L_INTEGER(y);
         }
 
         lval_delete(y);
@@ -650,8 +666,8 @@ lval* builtin_min(lenv *env, lval *a) {
 }
 
 lval* builtin_max(lenv *env, lval *a) {
-    for (int i = 0; i < a->count; i++) {
-        if (a->cell[i]->type != LVAL_INTEGER && a->cell[i]->type != LVAL_DECIMAL) {
+    L_FOREACH(i, a) {
+        if (L_TYPE_N(a, i) != LVAL_INTEGER && L_TYPE_N(a, i) != LVAL_DECIMAL) {
             lval_delete(a);
             return lval_error("Cannot operate on non-number");
         }
@@ -659,25 +675,25 @@ lval* builtin_max(lenv *env, lval *a) {
 
     lval* x = lval_pop(a, 0);
 
-    while (a->count > 0) {
+    while (L_COUNT(a) > 0) {
         lval* y = lval_pop(a, 0);
 
-        if (x->type == LVAL_DECIMAL && y->type == LVAL_DECIMAL) {
-            x->val.decimal = x->val.decimal > y->val.decimal
-                ? x->val.decimal
-                : y->val.decimal;
-        } else if (x->type == LVAL_DECIMAL && y->type == LVAL_INTEGER) {
-            x->val.decimal = x->val.decimal > y->val.integer
-                ? x->val.decimal
-                : (double)y->val.integer;
-        } else if (x->type == LVAL_INTEGER && y->type == LVAL_DECIMAL) {
-            x->val.integer = x->val.integer > y->val.decimal
-                ? x->val.integer
-                : (int)y->val.decimal;
+        if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_DECIMAL) {
+            L_DECIMAL(x) = L_DECIMAL(x) > L_DECIMAL(y)
+                ? L_DECIMAL(x)
+                : L_DECIMAL(y);
+        } else if (L_TYPE(x) == LVAL_DECIMAL && L_TYPE(y) == LVAL_INTEGER) {
+            L_DECIMAL(x) = L_DECIMAL(x) > L_INTEGER(y)
+                ? L_DECIMAL(x)
+                : (double)L_INTEGER(y);
+        } else if (L_TYPE(x) == LVAL_INTEGER && L_TYPE(y) == LVAL_DECIMAL) {
+            L_INTEGER(x) = L_INTEGER(x) > L_DECIMAL(y)
+                ? L_INTEGER(x)
+                : (int)L_DECIMAL(y);
         } else {
-            x->val.integer = x->val.integer > y->val.integer
-                ? x->val.integer
-                : y->val.integer;
+            L_INTEGER(x) = L_INTEGER(x) > L_INTEGER(y)
+                ? L_INTEGER(x)
+                : L_INTEGER(y);
         }
 
         lval_delete(y);
@@ -695,11 +711,11 @@ lval* builtin_cons(lenv *env, lval* a) {
     lval* v = lval_pop(a, 0);
     lval_delete(a);
 
-    v->count++;
+    L_COUNT(v)++;
     // realloc and unshift memory
-    v->cell = realloc(v->cell, sizeof(lval*) * v->count);
-    memmove(&v->cell[1], &v->cell[0], sizeof(lval*) * (v->count - 1));
-    v->cell[0] = x;
+    L_CELL(v) = realloc(L_CELL(v), sizeof(lval*) * L_COUNT(v));
+    memmove(&L_CELL_N(v, 1), &L_CELL_N(v, 0), sizeof(lval*) * (L_COUNT(v) - 1));
+    L_CELL_N(v, 0) = x;
 
     return v;
 }
@@ -711,7 +727,7 @@ lval* builtin_init(lenv *env, lval* a) {
 
     lval* v = lval_take(a, 0);
     // delete last element and return
-    lval_delete(lval_pop(v, (v->count - 1)));
+    lval_delete(lval_pop(v, (L_COUNT(v) - 1)));
     return v;
 }
 
@@ -722,7 +738,7 @@ lval* builtin_head(lenv *env, lval* a) {
 
     lval* v = lval_take(a, 0);
     // delete all elements that are not head and return
-    while (v->count > 1) {
+    while (L_COUNT(v) > 1) {
         lval_delete(lval_pop(v, 1));
     }
     return v;
@@ -744,31 +760,31 @@ lval* builtin_len(lenv *env, lval* a) {
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "len");
 
     lval* x = lval_take(a, 0);
-    int len = x->count;
+    int len = L_COUNT(x);
     lval_delete(x);
 
     return lval_integer(len);
 }
 
 lval* builtin_list(lenv *env, lval* a) {
-    a->type = LVAL_QEXPRESSION;
+    L_TYPE(a) = LVAL_QEXPRESSION;
     return a;
 }
 
 lval* builtin_def(lenv *env, lval *a) {
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "def");
     // First argument is list of symbols
-    lval *names = a->cell[0];
-    for (int i = 0; i < names->count; i++) {
-        LASSERT(a, names->cell[i]->type == LVAL_SYMBOL,
+    lval *names = L_CELL_N(a, 0);
+    L_FOREACH(i, names) {
+        LASSERT(a, L_TYPE_N(names, i) == LVAL_SYMBOL,
                "'def' cannot define non-symbol");
     }
 
-    LASSERT(a, names->count == a->count - 1,
+    LASSERT(a, L_COUNT(names) == L_COUNT(a) - 1,
             "Function 'def' cannot define incorrect number of values to symbols");
 
-    for (int i = 0; i < names->count; i++) {
-        lenv_put(env, names->cell[i], a->cell[i + 1]);
+    L_FOREACH(i, names) {
+        lenv_put(env, L_CELL_N(names, i), a->cell[i + 1]);
     }
 
     lval_delete(a);
@@ -778,49 +794,49 @@ lval* builtin_def(lenv *env, lval *a) {
 lval* lval_eval(lenv *env, lval *v);
 lval* lval_eval_sexpr(lenv *env, lval *v) {
     // evaluate children
-    for (int i = 0; i < v->count; i++) {
-        v->cell[i] = lval_eval(env, v->cell[i]);
+    L_FOREACH(i, v) {
+        L_CELL_N(v, i) = lval_eval(env, L_CELL_N(v, i));
     }
 
     // check errors
-    for (int i = 0; i < v->count; i++) {
-        if (v->cell[i]->type == LVAL_ERROR) {
+    L_FOREACH(i, v) {
+        if (L_TYPE_N(v, i) == LVAL_ERROR) {
             return lval_take(v, i);
         }
     }
 
     // empty expression
-    if (v->count == 0) {
+    if (L_COUNT(v) == 0) {
         return v;
     }
 
     // single expression
-    if (v->count == 1) {
+    if (L_COUNT(v) == 1) {
         return lval_take(v, 0);
     }
 
     // first element should be Function
     lval *f = lval_pop(v, 0);
-    if (f->type != LVAL_FUNCTION) {
+    if (L_TYPE(f) != LVAL_FUNCTION) {
         lval_delete(f);
         lval_delete(v);
         return lval_error("First element is not a function!");
     }
 
-    lval *result = f->val.fn(env, v);
+    lval *result = L_FUNCTION(f)(env, v);
     lval_delete(f);
 
     return result;
 }
 
 lval* lval_eval(lenv *env, lval *v) {
-    if (v->type == LVAL_SYMBOL) {
+    if (L_TYPE(v) == LVAL_SYMBOL) {
         lval *x = lenv_get(env, v);
         lval_delete(v);
         return x;
     }
     // only evaluate s-expressions
-    if (v->type == LVAL_SEXPRESSION) {
+    if (L_TYPE(v) == LVAL_SEXPRESSION) {
         return lval_eval_sexpr(env, v);
     }
     return v;
@@ -831,17 +847,17 @@ lval* builtin_eval(lenv *env, lval* a) {
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "eval");
 
     lval* x = lval_take(a, 0);
-    x->type = LVAL_SEXPRESSION;
+    L_TYPE(x) = LVAL_SEXPRESSION;
     return lval_eval(env, x);
 }
 
 lval* builtin_join(lenv *env, lval* a) {
-    for (int i = 0; i < a->count; i++) {
+    L_FOREACH(i, a) {
         LASSERT_ARGUMENT_TYPE(a, i, LVAL_QEXPRESSION, "join");
     }
 
     lval* x = lval_pop(a, 0);
-    while (a->count) {
+    while (L_COUNT(a)) {
         x = lval_join(x, lval_pop(a, 0));
     }
     lval_delete(a);
