@@ -10,7 +10,7 @@
 #define STR_EQ(A, B) (strcmp((A), (B)) == 0)
 #define STR_CONTAIN(A, B) (strstr((A), (B)) == 0)
 
-// accessors
+// accessors for lval
 #define L_COUNT(lval)    (lval)->count
 #define L_CELL(lval)     (lval)->cell
 #define L_TYPE(lval)     (lval)->type
@@ -21,6 +21,9 @@
 #define L_SYMBOL(lval)   (lval)->val.symbol
 #define L_CELL_N(lval, n) (lval)->cell[(n)]
 #define L_TYPE_N(lval, n) L_CELL_N(lval, n)->type
+
+// accessors for lenv
+#define E_COUNT(lenv) (lenv)->count
 
 // loop
 #define L_FOREACH(i, e) for (int i = 0, lim = L_COUNT(e); i < lim; ++i)
@@ -114,7 +117,7 @@ char* ltype_name(int t) {
 
 lenv *lenv_new(void) {
     lenv *env = malloc(sizeof(lenv));
-    env->count = 0;
+    E_COUNT(env) = 0;
     env->names = NULL;
     env->values = NULL;
     return env;
@@ -152,7 +155,7 @@ void lval_delete(lval* v) {
 }
 
 void lenv_delete(lenv *env) {
-    for (int i = 0; i < env->count; i++) {
+    for (int i = 0; i < E_COUNT(env); i++) {
         free(env->names[i]);
         lval_delete(env->values[i]);
     }
@@ -214,7 +217,7 @@ lval* lval_error(char* format, ...) {
 }
 
 lval* lenv_get(lenv* env, lval *key) {
-    for (int i = 0; i < env->count; i++) {
+    for (int i = 0; i < E_COUNT(env); i++) {
         if (STR_EQ(env->names[i], L_SYMBOL(key))) {
             return lval_copy(env->values[i]);
         }
@@ -224,7 +227,7 @@ lval* lenv_get(lenv* env, lval *key) {
 
 void lenv_put(lenv *env, lval *key, lval *value) {
     // replace existing variables
-    for (int i = 0; i < env->count; i++) {
+    for (int i = 0; i < E_COUNT(env); i++) {
         if (STR_EQ(env->names[i], L_SYMBOL(key))) {
             lval_delete(env->values[i]);
             env->values[i] = lval_copy(value);
@@ -232,13 +235,13 @@ void lenv_put(lenv *env, lval *key, lval *value) {
         }
     }
 
-    env->count++;
-    env->values = realloc(env->values, sizeof(lval*) * env->count);
-    env->names = realloc(env->names, sizeof(char*) * env->count);
+    E_COUNT(env)++;
+    env->values = realloc(env->values, sizeof(lval*) * E_COUNT(env));
+    env->names = realloc(env->names, sizeof(char*) * E_COUNT(env));
 
-    env->values[env->count - 1] = lval_copy(value);
-    env->names[env->count - 1] = malloc(strlen(L_SYMBOL(key)) + 1);
-    strcpy(env->names[env->count - 1], L_SYMBOL(key));
+    env->values[E_COUNT(env) - 1] = lval_copy(value);
+    env->names[E_COUNT(env) - 1] = malloc(strlen(L_SYMBOL(key)) + 1);
+    strcpy(env->names[E_COUNT(env) - 1], L_SYMBOL(key));
 }
 
 lval* lval_function(lbuiltin fn) {
