@@ -255,7 +255,7 @@ lval* lval_function(lbuiltin fn) {
     return v;
 }
 
-lval* lval_qepression(void) {
+lval* lval_qexpression(void) {
     lval* v = malloc(sizeof(lval));
     L_TYPE(v) = LVAL_QEXPRESSION;
     L_COUNT(v) = 0;
@@ -337,7 +337,7 @@ lval* lval_read(mpc_ast_t* t) {
     }
 
     if (STR_CONTAIN(t->tag, "qexpr")) {
-        x = lval_qepression();
+        x = lval_qexpression();
     }
 
     // fill the list with any valid expression contained within
