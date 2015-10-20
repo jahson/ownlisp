@@ -7,8 +7,8 @@
 
 #include <editline/readline.h>
 
-#define STR_EQ(A, B) (strcmp((A), (B)) == 0)
-#define STR_CONTAIN(A, B) (strstr((A), (B)) == 0)
+#define STR_EQ(A, B) strcmp((A), (B)) == 0
+#define STR_CONTAIN(A, B) strstr((A), (B))
 
 // accessors for lval
 #define L_COUNT(lval)    (lval)->count
