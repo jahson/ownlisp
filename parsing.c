@@ -802,6 +802,10 @@ lval* builtin_def(lenv *env, lval *a) {
     return lval_sexpression();
 }
 
+lval* builtin_exit() {
+    exit(0);
+}
+
 lval* lval_eval(lenv *env, lval *v);
 lval* lval_eval_sexpr(lenv *env, lval *v) {
     // evaluate children
@@ -843,6 +847,10 @@ lval* lval_eval_sexpr(lenv *env, lval *v) {
 lval* lval_eval(lenv *env, lval *v) {
     if (L_TYPE(v) == LVAL_SYMBOL) {
         lval *x = lenv_get(env, v);
+        // shortcut for exit function
+        if (L_TYPE(x) == LVAL_FUNCTION && STR_EQ(L_SYMBOL(v), "exit")) {
+            builtin_exit();
+        }
         lval_delete(v);
         return x;
     }
@@ -873,10 +881,6 @@ lval* builtin_join(lenv *env, lval* a) {
     }
     lval_delete(a);
     return x;
-}
-
-lval* builtin_exit(lenv *env, lval *a) {
-    exit(0);
 }
 
 void lenv_add_builtin(lenv *env, char *name, lbuiltin fn) {
