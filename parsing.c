@@ -355,12 +355,12 @@ lval* lval_read(mpc_ast_t* t) {
 }
 
 
-void lval_print(lval* v); // forward declare to use in 'lval_expr_print'
-void lval_expr_print(lval* v, char open, char close) {
+void lval_print(lenv *env, lval *v); // forward declare to use in 'lval_expr_print'
+void lval_expr_print(lenv *env, lval *v, char open, char close) {
     putchar(open);
     L_FOREACH(i, v) {
         // print value contained within
-        lval_print(L_CELL_N(v, i));
+        lval_print(env, L_CELL_N(v, i));
 
         // don't print trailing space if last element
         if (i != (L_COUNT(v) - 1)) {
@@ -370,7 +370,7 @@ void lval_expr_print(lval* v, char open, char close) {
     putchar(close);
 }
 
-void lval_print(lval* v) {
+void lval_print(lenv *env, lval *v) {
     switch (L_TYPE(v)) {
         case LVAL_INTEGER:
             printf("%li", L_INTEGER(v));
@@ -382,16 +382,20 @@ void lval_print(lval* v) {
             printf("%s", L_SYMBOL(v));
             break;
         case LVAL_SEXPRESSION:
-            lval_expr_print(v, '(', ')');
+            lval_expr_print(env, v, '(', ')');
             break;
         case LVAL_QEXPRESSION:
-            lval_expr_print(v, '{', '}');
+            lval_expr_print(env, v, '{', '}');
             break;
         case LVAL_ERROR:
             printf("Error: %s", L_ERROR(v));
             break;
         case LVAL_FUNCTION:
-            printf("<function>");
+            for (int i = 0, lim = E_COUNT(env); i < lim; ++i) {
+                if (L_FUNCTION(E_VALUES_N(env, i)) == L_FUNCTION(v)) {
+                    printf("<builtin function '%s'>", E_NAMES_N(env, i));
+                }
+            }
             break;
         default:
             printf("Error: Unknown value type %d", L_TYPE(v));
@@ -399,8 +403,8 @@ void lval_print(lval* v) {
     }
 }
 
-void lval_println(lval* v) {
-    lval_print(v);
+void lval_println(lenv *env, lval *v) {
+    lval_print(env, v);
     putchar('\n');
 }
 
@@ -958,7 +962,7 @@ int main(int argc, char** argv) {
         mpc_result_t r;
         if (mpc_parse("<stdin>", input, Lliisspp, &r)) {
             lval* x = lval_eval(env, lval_read(r.output));
-            lval_println(x);
+            lval_println(env, x);
             mpc_ast_delete(r.output);
         } else {
             mpc_err_print(r.error);
