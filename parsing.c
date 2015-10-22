@@ -789,7 +789,7 @@ lval* builtin_def(lenv *env, lval *a) {
     L_FOREACH(i, names) {
         LASSERT(a, L_TYPE_N(names, i) == LVAL_SYMBOL,
                "'def' cannot define non-symbol");
-        LASSERT(a, L_TYPE(lenv_get(env, L_CELL_N(names, i))) == LVAL_ERROR,
+        LASSERT(a, L_TYPE(lenv_get(env, L_CELL_N(names, i))) != LVAL_FUNCTION,
                 "Cannot redeclare builitin function.");
     }
 
