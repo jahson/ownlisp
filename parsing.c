@@ -789,10 +789,12 @@ lval* builtin_def(lenv *env, lval *a) {
     L_FOREACH(i, names) {
         LASSERT(a, L_TYPE_N(names, i) == LVAL_SYMBOL,
                "'def' cannot define non-symbol");
+        LASSERT(a, L_TYPE(lenv_get(env, L_CELL_N(names, i))) == LVAL_ERROR,
+                "Cannot redeclare builitin function.");
     }
 
     LASSERT(a, L_COUNT(names) == L_COUNT(a) - 1,
-            "Function 'def' cannot define incorrect number of values to symbols");
+            "'def' cannot define incorrect number of values to symbols");
 
     L_FOREACH(i, names) {
         lenv_put(env, L_CELL_N(names, i), a->cell[i + 1]);
