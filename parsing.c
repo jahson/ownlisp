@@ -13,8 +13,11 @@
 // accessors for lval
 #define L_COUNT(lval)    (lval)->count
 #define L_CELL(lval)     (lval)->cell
+#define L_ENV(lval)     (lval)->env
 #define L_TYPE(lval)     (lval)->type
-#define L_FUNCTION(lval) (lval)->val.fn
+#define L_BUILTIN(lval) (lval)->val.builtin
+#define L_FORMALS(lval) (lval)->formals
+#define L_BODY(lval)    (lval)->body
 #define L_INTEGER(lval)  (lval)->val.integer
 #define L_DECIMAL(lval)  (lval)->val.decimal
 #define L_ERROR(lval)    (lval)->val.error
@@ -79,10 +82,13 @@ struct lval {
     union {
         long integer;
         double decimal;
-        char* error;
-        char* symbol;
-        lbuiltin fn;
+        char *error;
+        char *symbol;
+        lbuiltin builtin;
     } val;
+    lenv *env;
+    lval *formals;
+    lval *body;
     int count;
     struct lval** cell;
 };
@@ -127,6 +133,7 @@ lenv *lenv_new(void) {
     return env;
 }
 
+void lenv_delete(lenv *env);
 void lval_delete(lval* v) {
     switch (L_TYPE(v)) {
         case LVAL_INTEGER:
@@ -151,6 +158,11 @@ void lval_delete(lval* v) {
             free(L_CELL(v));
             break;
         case LVAL_FUNCTION:
+            if (!L_BUILTIN(v)) {
+                lenv_delete(L_ENV(v));
+                lval_delete(L_FORMALS(v));
+                lval_delete(L_BODY(v));
+            }
             break;
     }
 
@@ -174,7 +186,14 @@ lval* lval_copy(lval *a) {
 
     switch (L_TYPE(a)) {
         case LVAL_FUNCTION:
-            L_FUNCTION(x) = L_FUNCTION(a);
+            if (L_BUILTIN(a)) {
+            L_BUILTIN(x) = L_BUILTIN(a);
+            } else {
+                L_BUILTIN(x) = NULL;
+                L_ENV(x) = lenv_copy(L_ENV(v));
+                L_FORMALS(x) = lval_copy(L_FORMALS(v));
+                L_BODY(x) = lval_copy(L_BODY(v));
+            }
             break;
         case LVAL_INTEGER:
             L_INTEGER(x) = L_INTEGER(a);
@@ -248,10 +267,21 @@ void lenv_put(lenv *env, lval *key, lval *value) {
     strcpy(E_NAMES_N(env, E_COUNT(env) - 1), L_SYMBOL(key));
 }
 
+lval* lval_lambda(lval *formals, lval *body) {
+    lval *v = malloc(sizeof(lval));
+    L_TYPE(v) = L_FUNCTION;
+    L_BUILTIN(v) = null;
+    L_ENV(v) = lenv_new();
+    L_FORMALS(v) = formals;
+    L_BODY(body);
+
+    return v;
+}
+
 lval* lval_function(lbuiltin fn) {
     lval* v = malloc(sizeof(lval));
     L_TYPE(v) = LVAL_FUNCTION;
-    L_FUNCTION(v) = fn;
+    L_BUILTIN(v) = fn;
     return v;
 }
 
@@ -391,11 +421,20 @@ void lval_print(lenv *env, lval *v) {
             printf("Error: %s", L_ERROR(v));
             break;
         case LVAL_FUNCTION:
+            if (L_BUILTIN(v)) {
             for (int i = 0, lim = E_COUNT(env); i < lim; ++i) {
-                if (L_FUNCTION(E_VALUES_N(env, i)) == L_FUNCTION(v)) {
+                if (L_BUILTIN(E_VALUES_N(env, i)) == L_BUILTIN(v)) {
                     printf("<builtin function '%s'>", E_NAMES_N(env, i));
                 }
             }
+            } else {
+                printf("(\\ ");
+                lval_print(L_FORMALS(v));
+                putchar(' ');
+                lval_print(L_BODY(v));
+                putchar(')');
+            }
+
             break;
         default:
             printf("Error: Unknown value type %d", L_TYPE(v));
@@ -840,7 +879,7 @@ lval* lval_eval_sexpr(lenv *env, lval *v) {
         return lval_error("First element is not a function!");
     }
 
-    lval *result = L_FUNCTION(f)(env, v);
+    lval *result = L_BUILTIN(f)(env, v);
     lval_delete(f);
 
     return result;
