@@ -472,6 +472,25 @@ lval* lval_join(lval* x, lval* y) {
     return x;
 }
 
+lval* builtin_lambda(lenv *env, lval *a) {
+    LASSERT_ARGUMENT_NUMBER(a, 2, "\\");
+    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "\\");
+    LASSERT_ARGUMENT_TYPE(a, 1, LVAL_QEXPRESSION, "\\");
+
+    // First Q-Expression should contain only symbols
+    L_FOREACH(i, a) {
+        LASSERT(a, L_TYPE(L_CELL_N(L_CELL_N(a, 0), i)) == LVAL_SYMBOL,
+                "Cannot define non-symbol. Got %s, expected %s.",
+                ltype_name(L_CELL_N(L_CELL_N(a, 0), i)), ltype_name(LVAL_SYMBOL));
+    }
+
+    lval *formals = lval_pop(a, 0);
+    lval *body = lval_pop(a, 0);
+    lval_delete(a);
+
+    return lval_lambda(formals, body);
+}
+
 lval* builtin_op(char *operator, lenv *env, lval *a) {
     L_FOREACH(i, a) {
         if (L_TYPE_N(a, i) != LVAL_INTEGER && L_TYPE_N(a, i) != LVAL_DECIMAL) {
