@@ -34,6 +34,7 @@
 
 // loop
 #define L_FOREACH(i, e) for (int i = 0, lim = L_COUNT(e); i < lim; ++i)
+#define E_FOREACH(i, e) for (int i = 0, lim = E_COUNT(e); i < lim; ++i)
 
 #define LASSERT(args, cond, format, ...) \
     if (!(cond)) { \
@@ -171,7 +172,7 @@ void lval_delete(lval* v) {
 }
 
 void lenv_delete(lenv *env) {
-    for (int i = 0; i < E_COUNT(env); i++) {
+    E_FOREACH(i, env) {
         free(E_NAMES_N(env, i));
         lval_delete(E_VALUES_N(env, i));
     }
@@ -240,7 +241,7 @@ lval* lval_error(char* format, ...) {
 }
 
 lval* lenv_get(lenv* env, lval *key) {
-    for (int i = 0; i < E_COUNT(env); i++) {
+    E_FOREACH(i, env) {
         if (STR_EQ(E_NAMES_N(env, i), L_SYMBOL(key))) {
             return lval_copy(E_VALUES_N(env, i));
         }
@@ -250,7 +251,7 @@ lval* lenv_get(lenv* env, lval *key) {
 
 void lenv_put(lenv *env, lval *key, lval *value) {
     // replace existing variables
-    for (int i = 0; i < E_COUNT(env); i++) {
+    E_FOREACH(i, env) {
         if (STR_EQ(E_NAMES_N(env, i), L_SYMBOL(key))) {
             lval_delete(E_VALUES_N(env, i));
             E_VALUES_N(env, i) = lval_copy(value);
@@ -422,11 +423,11 @@ void lval_print(lenv *env, lval *v) {
             break;
         case LVAL_FUNCTION:
             if (L_BUILTIN(v)) {
-            for (int i = 0, lim = E_COUNT(env); i < lim; ++i) {
-                if (L_BUILTIN(E_VALUES_N(env, i)) == L_BUILTIN(v)) {
-                    printf("<builtin function '%s'>", E_NAMES_N(env, i));
+                E_FOREACH(i, env) {
+                    if (L_BUILTIN(E_VALUES_N(env, i)) == L_BUILTIN(v)) {
+                        printf("<builtin function '%s'>", E_NAMES_N(env, i));
+                    }
                 }
-            }
             } else {
                 printf("(\\ ");
                 lval_print(L_FORMALS(v));
