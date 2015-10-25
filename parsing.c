@@ -109,18 +109,60 @@ enum {
 };
 
 // forward declarations
+char *ltype_name(int t);
+lenv *lenv_new(void);
+lenv *lenv_copy(lenv *env);
+lval *lval_call(lenv *env, lval *func, lval *a);
+void lval_delete(lval *v);
 void lenv_delete(lenv *env);
-void lval_print(lenv *env, lval *v);
-lval* lval_copy(lval *a);
-void lval_delete(lval* v);
-lval* lval_error(char* format, ...);
-lval* lval_pop(lval* v, int i);
+lval *lval_copy(lval *a);
+lval *lval_error(char *format, ...);
+lval *lenv_get(lenv *env, lval *key);
+void lenv_def(lenv *env, lval *key, lval *value);
 void lenv_put(lenv *env, lval *key, lval *value);
-lval* lval_add(lval* v, lval* x);
-lval* lval_sexpression(void);
-lval* builtin_eval(lenv *env, lval* a);
-lval* builtin_list(lenv *env, lval* a);
-lval* lval_qexpression(void);
+lval *lval_lambda(lval *formals, lval *body);
+lval *lval_function(lbuiltin fn);
+lval *lval_qexpression(void);
+lval *lval_integer(long x);
+lval *lval_decimal(double x);
+lval *lval_symbol(char *m);
+lval *lval_sexpression(void);
+lval *lval_read_number(mpc_ast_t *t);
+lval *lval_add(lval *v, lval *x);
+lval *lval_read(mpc_ast_t *t);
+void lval_expr_print(lenv *env, lval *v, char open, char close);
+void lval_print(lenv *env, lval *v);
+void lval_println(lenv *env, lval *v);
+lval *lval_pop(lval *v, int i);
+lval *lval_take(lval *v, int i);
+lval *lval_join(lval *x, lval *y);
+lval *builtin_lambda(lenv *env, lval *a);
+lval *builtin_op(char *operator, lenv *env, lval *a);
+lval *builtin_add(lenv *env, lval *a);
+lval *builtin_sub(lenv *env, lval *a);
+lval *builtin_mul(lenv *env, lval *a);
+lval *builtin_div(lenv *env, lval *a);
+lval *builtin_mod(lenv *env, lval *a);
+lval *builtin_pow(lenv *env, lval *a);
+lval *builtin_min(lenv *env, lval *a);
+lval *builtin_max(lenv *env, lval *a);
+lval *builtin_cons(lenv *env, lval *a);
+lval *builtin_init(lenv *env, lval *a);
+lval *builtin_head(lenv *env, lval *a);
+lval *builtin_tail(lenv *env, lval *a);
+lval *builtin_len(lenv *env, lval *a);
+lval *builtin_list(lenv *env, lval *a);
+lval *builtin_var(lenv *env, lval *a, char *func);
+lval *builtin_def(lenv *env, lval *a);
+lval *builtin_put(lenv *env, lval *a);
+lval *builtin_exit(lenv *env, lval *a);
+lval *lval_eval_sexpr(lenv *env, lval *v);
+lval *lval_eval(lenv *env, lval *v);
+lval *builtin_eval(lenv *env, lval *a);
+lval *builtin_join(lenv *env, lval *a);
+void lenv_add_builtin(lenv *env, char *name, lbuiltin fn);
+void lenv_add_builtins(lenv *env);
+int main(int argc, char **argv);
 
 char* ltype_name(int t) {
     switch (t) {
@@ -168,6 +210,7 @@ lenv *lenv_copy(lenv *env) {
 }
 
 lval* lval_call(lenv *env, lval *func, lval *a) {
+    // apply immediately if builtin
     if (L_BUILTIN(func) != NULL) {
         return L_BUILTIN(func)(env, a);
     }
@@ -175,7 +218,9 @@ lval* lval_call(lenv *env, lval *func, lval *a) {
     int given = L_COUNT(a);
     int total = L_COUNT(L_FORMALS(func));
 
+    // while there are arguments to bind
     while (L_COUNT(a)) {
+        // if we've ran out of formal arguments to bind
         if (L_COUNT(L_FORMALS(func)) == 0) {
             lval_delete(a);
             return lval_error("Function passed too many arguments. Got %i, expected %i",
@@ -183,7 +228,10 @@ lval* lval_call(lenv *env, lval *func, lval *a) {
         }
 
         lval *symbol = lval_pop(L_FORMALS(func), 0);
+
+        // support for variable arguments in user-defined functions
         if (STR_EQ(L_SYMBOL(symbol), "&")) {
+            // '&' should be followed by another symbol
             if (L_COUNT(L_FORMALS(func)) != 1) {
                 lval_delete(a);
                 return lval_error("Function format invalid. "
@@ -989,7 +1037,7 @@ lval* builtin_put(lenv *env, lval *a) {
     return builtin_var(env, a, "=");
 }
 
-lval* builtin_exit() {
+lval* builtin_exit(lenv *env, lval *a) {
     exit(0);
 }
 
@@ -1036,7 +1084,7 @@ lval* lval_eval(lenv *env, lval *v) {
         lval *x = lenv_get(env, v);
         // shortcut for exit function
         if (L_TYPE(x) == LVAL_FUNCTION && STR_EQ(L_SYMBOL(v), "exit")) {
-            builtin_exit();
+            builtin_exit(env, v);
         }
         lval_delete(v);
         return x;
