@@ -119,6 +119,8 @@ void lenv_put(lenv *env, lval *key, lval *value);
 lval* lval_add(lval* v, lval* x);
 lval* lval_sexpression(void);
 lval* builtin_eval(lenv *env, lval* a);
+lval* builtin_list(lenv *env, lval* a);
+lval* lval_qexpression(void);
 
 char* ltype_name(int t) {
     switch (t) {
@@ -181,6 +183,21 @@ lval* lval_call(lenv *env, lval *func, lval *a) {
         }
 
         lval *symbol = lval_pop(L_FORMALS(func), 0);
+        if (STR_EQ(L_SYMBOL(symbol), "&")) {
+            if (L_COUNT(L_FORMALS(func)) != 1) {
+                lval_delete(a);
+                return lval_error("Function format invalid. "
+                                  "Symbol '&' not followed by single symbol.");
+            }
+
+            lval *nsymbol = lval_pop(L_FORMALS(func), 0);
+            lenv_put(L_ENV(func), nsymbol, builtin_list(env, a));
+            lval_delete(symbol);
+            lval_delete(nsymbol);
+
+            break;
+        }
+
         lval *value = lval_pop(a, 0);
 
         lenv_put(L_ENV(func), symbol, value);
@@ -190,6 +207,23 @@ lval* lval_call(lenv *env, lval *func, lval *a) {
     }
 
     lval_delete(a);
+
+    if (L_COUNT(L_FORMALS(func)) > 0
+        && STR_EQ(L_SYMBOL(L_CELL_N(L_FORMALS(func), 0)), "&")) {
+        if (L_COUNT(L_FORMALS(func)) != 2) {
+            return lval_error("Function format invalid. "
+                              "Symbol '&' not followed by single symbol.");
+        }
+
+        lval_delete(lval_pop(L_FORMALS(func), 0));
+
+        lval *symbol = lval_pop(L_FORMALS(func), 0);
+        lval *value = lval_qexpression();
+
+        lenv_put(L_ENV(func), symbol, value);
+        lval_delete(symbol);
+        lval_delete(value);
+    }
 
     if (L_COUNT(L_FORMALS(func)) == 0) {
         // if all formal have been bound => evaluate
