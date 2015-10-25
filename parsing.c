@@ -26,6 +26,7 @@
 #define L_TYPE_N(lval, n) L_CELL_N(lval, n)->type
 
 // accessors for lenv
+#define E_PARENT(lenv) (lenv)->parent
 #define E_COUNT(lenv) (lenv)->count
 #define E_NAMES(lenv) (lenv)->names
 #define E_VALUES(lenv) (lenv)->values
@@ -33,7 +34,7 @@
 #define E_VALUES_N(lenv, i) (lenv)->values[(i)]
 
 // loop
-#define L_FOREACH(i, e) for (int i = 0, lim = L_COUNT(e); i < lim; ++i)
+#define FOREACH_SEXP(i, e) for (int i = 0, lim = L_COUNT(e); i < lim; ++i)
 #define E_FOREACH(i, e) for (int i = 0, lim = E_COUNT(e); i < lim; ++i)
 
 #define LASSERT(args, cond, format, ...) \
@@ -94,6 +95,8 @@ struct lval {
     struct lval** cell;
 };
 struct lenv {
+    lenv *parent;
+
     int count;
     char **names;
     lval **values;
@@ -104,6 +107,18 @@ enum {
     LVAL_INTEGER, LVAL_DECIMAL, LVAL_ERROR, LVAL_SYMBOL, LVAL_SEXPRESSION,
     LVAL_QEXPRESSION, LVAL_FUNCTION
 };
+
+// forward declarations
+void lenv_delete(lenv *env);
+void lval_print(lenv *env, lval *v);
+lval* lval_copy(lval *a);
+void lval_delete(lval* v);
+lval* lval_error(char* format, ...);
+lval* lval_pop(lval* v, int i);
+void lenv_put(lenv *env, lval *key, lval *value);
+lval* lval_add(lval* v, lval* x);
+lval* lval_sexpression(void);
+lval* builtin_eval(lenv *env, lval* a);
 
 char* ltype_name(int t) {
     switch (t) {
@@ -128,13 +143,67 @@ char* ltype_name(int t) {
 
 lenv *lenv_new(void) {
     lenv *env = malloc(sizeof(lenv));
+    E_PARENT(env) = NULL;
     E_COUNT(env) = 0;
     E_NAMES(env) = NULL;
     E_VALUES(env) = NULL;
     return env;
 }
 
-void lenv_delete(lenv *env);
+lenv *lenv_copy(lenv *env) {
+    lenv *new_env = malloc(sizeof(lenv));
+    E_PARENT(new_env) = E_PARENT(env);
+    E_COUNT(new_env) = E_COUNT(env);
+    E_VALUES(new_env) = malloc(sizeof(lval*) * E_COUNT(new_env));
+    E_NAMES(new_env) = malloc(sizeof(char*) * E_COUNT(new_env));
+    E_FOREACH(i, env) {
+        E_NAMES_N(new_env, i) = malloc(strlen(E_NAMES_N(env, i)) + 1);
+        strcpy(E_NAMES_N(new_env, i), E_NAMES_N(env, i));
+        E_VALUES_N(new_env, i) = lval_copy(E_VALUES_N(env, i));
+    }
+
+    return new_env;
+}
+
+lval* lval_call(lenv *env, lval *func, lval *a) {
+    if (L_BUILTIN(func) != NULL) {
+        return L_BUILTIN(func)(env, a);
+    }
+
+    int given = L_COUNT(a);
+    int total = L_COUNT(L_FORMALS(func));
+
+    while (L_COUNT(a)) {
+        if (L_COUNT(L_FORMALS(func)) == 0) {
+            lval_delete(a);
+            return lval_error("Function passed too many arguments. Got %i, expected %i",
+                              given, total);
+        }
+
+        lval *symbol = lval_pop(L_FORMALS(func), 0);
+        lval *value = lval_pop(a, 0);
+
+        lenv_put(L_ENV(func), symbol, value);
+
+        lval_delete(symbol);
+        lval_delete(value);
+    }
+
+    lval_delete(a);
+
+    if (L_COUNT(L_FORMALS(func)) == 0) {
+        // if all formal have been bound => evaluate
+        E_PARENT(L_ENV(func)) = env;
+        return builtin_eval(
+                            L_ENV(func),
+                            lval_add(lval_sexpression(), lval_copy(L_BODY(func)))
+                           );
+    } else {
+        // otherwise return partially evaluated function
+        return lval_copy(func);
+    }
+}
+
 void lval_delete(lval* v) {
     switch (L_TYPE(v)) {
         case LVAL_INTEGER:
@@ -152,7 +221,7 @@ void lval_delete(lval* v) {
         case LVAL_QEXPRESSION:
         case LVAL_SEXPRESSION:
             // free memory for all elements inside
-            L_FOREACH(i, v) {
+            FOREACH_SEXP(i, v) {
                 lval_delete(L_CELL_N(v, i));
             }
             // free memory allocated to contain the pointers
@@ -188,12 +257,12 @@ lval* lval_copy(lval *a) {
     switch (L_TYPE(a)) {
         case LVAL_FUNCTION:
             if (L_BUILTIN(a)) {
-            L_BUILTIN(x) = L_BUILTIN(a);
+                L_BUILTIN(x) = L_BUILTIN(a);
             } else {
                 L_BUILTIN(x) = NULL;
-                L_ENV(x) = lenv_copy(L_ENV(v));
-                L_FORMALS(x) = lval_copy(L_FORMALS(v));
-                L_BODY(x) = lval_copy(L_BODY(v));
+                L_ENV(x) = lenv_copy(L_ENV(a));
+                L_FORMALS(x) = lval_copy(L_FORMALS(a));
+                L_BODY(x) = lval_copy(L_BODY(a));
             }
             break;
         case LVAL_INTEGER:
@@ -214,7 +283,7 @@ lval* lval_copy(lval *a) {
         case LVAL_QEXPRESSION:
             L_COUNT(x) = L_COUNT(a);
             L_CELL(x) = malloc(sizeof(lval*) * L_COUNT(x));
-            L_FOREACH(i, x) {
+            FOREACH_SEXP(i, x) {
                 L_CELL_N(x, i) = lval_copy(L_CELL_N(a, i));
             }
             break;
@@ -246,7 +315,17 @@ lval* lenv_get(lenv* env, lval *key) {
             return lval_copy(E_VALUES_N(env, i));
         }
     }
-    return lval_error("Unbound symbol '%s'", L_SYMBOL(key));
+
+    if (E_PARENT(env)) {
+        return lenv_get(E_PARENT(env), key);
+    } else {
+        return lval_error("Unbound symbol '%s'", L_SYMBOL(key));
+    }
+}
+
+void lenv_def(lenv *env, lval *key, lval *value) {
+    while (E_PARENT(env) != NULL) { env = E_PARENT(env); }
+    lenv_put(env, key, value);
 }
 
 void lenv_put(lenv *env, lval *key, lval *value) {
@@ -270,11 +349,11 @@ void lenv_put(lenv *env, lval *key, lval *value) {
 
 lval* lval_lambda(lval *formals, lval *body) {
     lval *v = malloc(sizeof(lval));
-    L_TYPE(v) = L_FUNCTION;
-    L_BUILTIN(v) = null;
+    L_TYPE(v) = LVAL_FUNCTION;
+    L_BUILTIN(v) = NULL;
     L_ENV(v) = lenv_new();
     L_FORMALS(v) = formals;
-    L_BODY(body);
+    L_BODY(v) = body;
 
     return v;
 }
@@ -386,10 +465,9 @@ lval* lval_read(mpc_ast_t* t) {
 }
 
 
-void lval_print(lenv *env, lval *v); // forward declare to use in 'lval_expr_print'
 void lval_expr_print(lenv *env, lval *v, char open, char close) {
     putchar(open);
-    L_FOREACH(i, v) {
+    FOREACH_SEXP(i, v) {
         // print value contained within
         lval_print(env, L_CELL_N(v, i));
 
@@ -430,9 +508,9 @@ void lval_print(lenv *env, lval *v) {
                 }
             } else {
                 printf("(\\ ");
-                lval_print(L_FORMALS(v));
+                lval_print(env, L_FORMALS(v));
                 putchar(' ');
-                lval_print(L_BODY(v));
+                lval_print(env, L_BODY(v));
                 putchar(')');
             }
 
@@ -479,10 +557,10 @@ lval* builtin_lambda(lenv *env, lval *a) {
     LASSERT_ARGUMENT_TYPE(a, 1, LVAL_QEXPRESSION, "\\");
 
     // First Q-Expression should contain only symbols
-    L_FOREACH(i, a) {
-        LASSERT(a, L_TYPE(L_CELL_N(L_CELL_N(a, 0), i)) == LVAL_SYMBOL,
+    FOREACH_SEXP(i, a) {
+        LASSERT(a, L_TYPE_N(L_CELL_N(a, 0), i) == LVAL_SYMBOL,
                 "Cannot define non-symbol. Got %s, expected %s.",
-                ltype_name(L_CELL_N(L_CELL_N(a, 0), i)), ltype_name(LVAL_SYMBOL));
+                ltype_name(L_TYPE_N(L_CELL_N(a, 0), i)), ltype_name(LVAL_SYMBOL));
     }
 
     lval *formals = lval_pop(a, 0);
@@ -493,7 +571,7 @@ lval* builtin_lambda(lenv *env, lval *a) {
 }
 
 lval* builtin_op(char *operator, lenv *env, lval *a) {
-    L_FOREACH(i, a) {
+    FOREACH_SEXP(i, a) {
         if (L_TYPE_N(a, i) != LVAL_INTEGER && L_TYPE_N(a, i) != LVAL_DECIMAL) {
             lval_delete(a);
             return lval_error("Cannot operate on non-number");
@@ -698,7 +776,7 @@ lval* builtin_pow(lenv *env, lval *a) {
 }
 
 lval* builtin_min(lenv *env, lval *a) {
-    L_FOREACH(i, a) {
+    FOREACH_SEXP(i, a) {
         if (L_TYPE_N(a, i) != LVAL_INTEGER && L_TYPE_N(a, i) != LVAL_DECIMAL) {
             lval_delete(a);
             return lval_error("Cannot operate on non-number");
@@ -736,7 +814,7 @@ lval* builtin_min(lenv *env, lval *a) {
 }
 
 lval* builtin_max(lenv *env, lval *a) {
-    L_FOREACH(i, a) {
+    FOREACH_SEXP(i, a) {
         if (L_TYPE_N(a, i) != LVAL_INTEGER && L_TYPE_N(a, i) != LVAL_DECIMAL) {
             lval_delete(a);
             return lval_error("Cannot operate on non-number");
@@ -841,26 +919,40 @@ lval* builtin_list(lenv *env, lval* a) {
     return a;
 }
 
-lval* builtin_def(lenv *env, lval *a) {
-    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "def");
-    // First argument is list of symbols
-    lval *names = L_CELL_N(a, 0);
-    L_FOREACH(i, names) {
-        LASSERT(a, L_TYPE_N(names, i) == LVAL_SYMBOL,
-               "'def' cannot define non-symbol");
-        LASSERT(a, L_TYPE(lenv_get(env, L_CELL_N(names, i))) != LVAL_FUNCTION,
-                "Cannot redeclare builitin function.");
+lval* builtin_var(lenv *env, lval *a, char *func) {
+    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, func);
+
+    lval *symbols = L_CELL_N(a, 0);
+    FOREACH_SEXP(i, symbols) {
+        LASSERT(a, L_TYPE_N(symbols, i) == LVAL_SYMBOL,
+                "Function '%s' cannot define non-symbol. Gor %s, expected %s.",
+                func, ltype_name(L_TYPE_N(symbols, i)), ltype_name(LVAL_SYMBOL));
     }
 
-    LASSERT(a, L_COUNT(names) == L_COUNT(a) - 1,
-            "'def' cannot define incorrect number of values to symbols");
+    LASSERT(a, L_COUNT(symbols) == L_COUNT(a) - 1,
+            "Function '%s' passed too many arguments for symbols. Got %i, expected %i.",
+            func, L_COUNT(symbols), L_COUNT(a) - 1);
 
-    L_FOREACH(i, names) {
-        lenv_put(env, L_CELL_N(names, i), a->cell[i + 1]);
+    FOREACH_SEXP(i, symbols) {
+        if (STR_EQ(func, "def")) {
+            lenv_def(env, L_CELL_N(symbols, i), L_CELL_N(a, i + 1));
+        }
+
+        if (STR_EQ(func, "=")) {
+            lenv_put(env, L_CELL_N(symbols, i), L_CELL_N(a, i + 1));
+        }
     }
 
     lval_delete(a);
     return lval_sexpression();
+}
+
+lval* builtin_def(lenv *env, lval *a) {
+    return builtin_var(env, a, "def");
+}
+
+lval* builtin_put(lenv *env, lval *a) {
+    return builtin_var(env, a, "=");
 }
 
 lval* builtin_exit() {
@@ -870,12 +962,12 @@ lval* builtin_exit() {
 lval* lval_eval(lenv *env, lval *v);
 lval* lval_eval_sexpr(lenv *env, lval *v) {
     // evaluate children
-    L_FOREACH(i, v) {
+    FOREACH_SEXP(i, v) {
         L_CELL_N(v, i) = lval_eval(env, L_CELL_N(v, i));
     }
 
     // check errors
-    L_FOREACH(i, v) {
+    FOREACH_SEXP(i, v) {
         if (L_TYPE_N(v, i) == LVAL_ERROR) {
             return lval_take(v, i);
         }
@@ -899,7 +991,7 @@ lval* lval_eval_sexpr(lenv *env, lval *v) {
         return lval_error("First element is not a function!");
     }
 
-    lval *result = L_BUILTIN(f)(env, v);
+    lval *result = lval_call(env, f, v);
     lval_delete(f);
 
     return result;
@@ -932,7 +1024,7 @@ lval* builtin_eval(lenv *env, lval* a) {
 }
 
 lval* builtin_join(lenv *env, lval* a) {
-    L_FOREACH(i, a) {
+    FOREACH_SEXP(i, a) {
         LASSERT_ARGUMENT_TYPE(a, i, LVAL_QEXPRESSION, "join");
     }
 
@@ -975,9 +1067,11 @@ void lenv_add_builtins(lenv *env) {
 
     /* Variable Functions */
     lenv_add_builtin(env, "def", builtin_def);
+    lenv_add_builtin(env, "=", builtin_put);
 
     /* Other */
     lenv_add_builtin(env, "exit", builtin_exit);
+    lenv_add_builtin(env, "\\", builtin_lambda);
 }
 
 int main(int argc, char** argv) {
