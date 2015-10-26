@@ -37,6 +37,9 @@
 #define FOREACH_SEXP(i, e) for (int i = 0, lim = L_COUNT(e); i < lim; ++i)
 #define E_FOREACH(i, e) for (int i = 0, lim = E_COUNT(e); i < lim; ++i)
 
+// utils
+#define BUILTIN(n) lval *builtin_##n(lenv *env, lval *a)
+
 #define LASSERT(args, cond, format, ...) \
     if (!(cond)) { \
         lval *err = lval_error(format, ##__VA_ARGS__); \
@@ -633,7 +636,7 @@ lval* lval_join(lval* x, lval* y) {
     return x;
 }
 
-lval* builtin_lambda(lenv *env, lval *a) {
+BUILTIN(lambda) {
     LASSERT_ARGUMENT_NUMBER(a, 2, "\\");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "\\");
     LASSERT_ARGUMENT_TYPE(a, 1, LVAL_QEXPRESSION, "\\");
@@ -833,31 +836,31 @@ lval* builtin_op(char *operator, lenv *env, lval *a) {
     return x;
 }
 
-lval* builtin_add(lenv *env, lval *a) {
+BUILTIN(add) {
     return builtin_op("+", env, a);
 }
 
-lval* builtin_sub(lenv *env, lval *a) {
+BUILTIN(sub) {
     return builtin_op("-", env, a);
 }
 
-lval* builtin_mul(lenv *env, lval *a) {
+BUILTIN(mul) {
     return builtin_op("*", env, a);
 }
 
-lval* builtin_div(lenv *env, lval *a) {
+BUILTIN(div) {
     return builtin_op("/", env, a);
 }
 
-lval* builtin_mod(lenv *env, lval *a) {
+BUILTIN(mod) {
     return builtin_op("%", env, a);
 }
 
-lval* builtin_pow(lenv *env, lval *a) {
+BUILTIN(pow) {
     return builtin_op("^", env, a);
 }
 
-lval* builtin_min(lenv *env, lval *a) {
+BUILTIN(min) {
     FOREACH_SEXP(i, a) {
         if (L_TYPE_N(a, i) != LVAL_INTEGER && L_TYPE_N(a, i) != LVAL_DECIMAL) {
             lval_delete(a);
@@ -895,7 +898,7 @@ lval* builtin_min(lenv *env, lval *a) {
     return x;
 }
 
-lval* builtin_max(lenv *env, lval *a) {
+BUILTIN(max) {
     FOREACH_SEXP(i, a) {
         if (L_TYPE_N(a, i) != LVAL_INTEGER && L_TYPE_N(a, i) != LVAL_DECIMAL) {
             lval_delete(a);
@@ -933,7 +936,7 @@ lval* builtin_max(lenv *env, lval *a) {
     return x;
 }
 
-lval* builtin_cons(lenv *env, lval* a) {
+BUILTIN(cons) {
     LASSERT_ARGUMENT_NUMBER(a, 2, "cons");
     LASSERT_ARGUMENT_TYPE(a, 1, LVAL_QEXPRESSION, "cons");
 
@@ -950,7 +953,7 @@ lval* builtin_cons(lenv *env, lval* a) {
     return v;
 }
 
-lval* builtin_init(lenv *env, lval* a) {
+BUILTIN(init) {
     LASSERT_ARGUMENT_NUMBER(a, 1, "init");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "init");
     LASSERT_NOT_EMPTY_QEXPR(a, "init");
@@ -961,7 +964,7 @@ lval* builtin_init(lenv *env, lval* a) {
     return v;
 }
 
-lval* builtin_head(lenv *env, lval* a) {
+BUILTIN(head) {
     LASSERT_ARGUMENT_NUMBER(a, 1, "head");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "head");
     LASSERT_NOT_EMPTY_QEXPR(a, "head");
@@ -974,7 +977,7 @@ lval* builtin_head(lenv *env, lval* a) {
     return v;
 }
 
-lval* builtin_tail(lenv *env, lval* a) {
+BUILTIN(tail) {
     LASSERT_ARGUMENT_NUMBER(a, 1, "tail");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "tail");
     LASSERT_NOT_EMPTY_QEXPR(a, "tail");
@@ -985,7 +988,7 @@ lval* builtin_tail(lenv *env, lval* a) {
     return v;
 }
 
-lval* builtin_len(lenv *env, lval* a) {
+BUILTIN(len) {
     LASSERT_ARGUMENT_NUMBER(a, 1, "len");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "len");
 
@@ -996,7 +999,7 @@ lval* builtin_len(lenv *env, lval* a) {
     return lval_integer(len);
 }
 
-lval* builtin_list(lenv *env, lval* a) {
+BUILTIN(list) {
     L_TYPE(a) = LVAL_QEXPRESSION;
     return a;
 }
@@ -1029,19 +1032,18 @@ lval* builtin_var(lenv *env, lval *a, char *func) {
     return lval_sexpression();
 }
 
-lval* builtin_def(lenv *env, lval *a) {
+BUILTIN(def) {
     return builtin_var(env, a, "def");
 }
 
-lval* builtin_put(lenv *env, lval *a) {
+BUILTIN(put) {
     return builtin_var(env, a, "=");
 }
 
-lval* builtin_exit(lenv *env, lval *a) {
+BUILTIN(exit) {
     exit(0);
 }
 
-lval* lval_eval(lenv *env, lval *v);
 lval* lval_eval_sexpr(lenv *env, lval *v) {
     // evaluate children
     FOREACH_SEXP(i, v) {
@@ -1096,7 +1098,7 @@ lval* lval_eval(lenv *env, lval *v) {
     return v;
 }
 
-lval* builtin_eval(lenv *env, lval* a) {
+BUILTIN(eval) {
     LASSERT_ARGUMENT_NUMBER(a, 1, "eval");
     LASSERT_ARGUMENT_TYPE(a, 0, LVAL_QEXPRESSION, "eval");
 
@@ -1105,7 +1107,7 @@ lval* builtin_eval(lenv *env, lval* a) {
     return lval_eval(env, x);
 }
 
-lval* builtin_join(lenv *env, lval* a) {
+BUILTIN(join) {
     FOREACH_SEXP(i, a) {
         LASSERT_ARGUMENT_TYPE(a, i, LVAL_QEXPRESSION, "join");
     }
