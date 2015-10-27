@@ -25,6 +25,7 @@
 #define L_CELL_N(lval, n) (lval)->cell[(n)]
 #define L_TYPE_N(lval, n) L_CELL_N(lval, n)->type
 #define L_FORMALS_N(lval, n) L_CELL_N(L_FORMALS(lval), n)
+#define L_FORMALS_COUNT(lval) L_COUNT(L_FORMALS(lval))
 
 // accessors for lenv
 #define E_PARENT(lenv) (lenv)->parent
@@ -220,12 +221,12 @@ lval* lval_call(lenv *env, lval *func, lval *a) {
     }
 
     int given = L_COUNT(a);
-    int total = L_COUNT(L_FORMALS(func));
+    int total = L_FORMALS_COUNT(func);
 
     // while there are arguments to bind
     while (L_COUNT(a)) {
         // if we've ran out of formal arguments to bind
-        if (L_COUNT(L_FORMALS(func)) == 0) {
+        if (L_FORMALS_COUNT(func) == 0) {
             lval_delete(a);
             return lval_error("Function passed too many arguments. Got %i, expected %i",
                               given, total);
@@ -236,7 +237,7 @@ lval* lval_call(lenv *env, lval *func, lval *a) {
         // support for variable arguments in user-defined functions
         if (STR_EQ(L_SYMBOL(symbol), "&")) {
             // '&' should be followed by another symbol
-            if (L_COUNT(L_FORMALS(func)) != 1) {
+            if (L_FORMALS_COUNT(func) != 1) {
                 lval_delete(a);
                 return lval_error("Function format invalid. "
                                   "Symbol '&' not followed by single symbol.");
@@ -260,9 +261,9 @@ lval* lval_call(lenv *env, lval *func, lval *a) {
 
     lval_delete(a);
 
-    if (L_COUNT(L_FORMALS(func)) > 0
+    if (L_FORMALS_COUNT(func) > 0
         && STR_EQ(L_SYMBOL(L_FORMALS_N(func, 0)), "&")) {
-        if (L_COUNT(L_FORMALS(func)) != 2) {
+        if (L_FORMALS_COUNT(func) != 2) {
             return lval_error("Function format invalid. "
                               "Symbol '&' not followed by single symbol.");
         }
@@ -277,7 +278,7 @@ lval* lval_call(lenv *env, lval *func, lval *a) {
         lval_delete(value);
     }
 
-    if (L_COUNT(L_FORMALS(func)) == 0) {
+    if (L_FORMALS_COUNT(func) == 0) {
         // if all formal have been bound => evaluate
         E_PARENT(L_ENV(func)) = env;
         return builtin_eval(
