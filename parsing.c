@@ -24,6 +24,7 @@
 #define L_SYMBOL(lval)   (lval)->val.symbol
 #define L_CELL_N(lval, n) (lval)->cell[(n)]
 #define L_TYPE_N(lval, n) L_CELL_N(lval, n)->type
+#define L_FORMALS_N(lval, n) L_CELL_N(L_FORMALS(lval), n)
 
 // accessors for lenv
 #define E_PARENT(lenv) (lenv)->parent
@@ -260,7 +261,7 @@ lval* lval_call(lenv *env, lval *func, lval *a) {
     lval_delete(a);
 
     if (L_COUNT(L_FORMALS(func)) > 0
-        && STR_EQ(L_SYMBOL(L_CELL_N(L_FORMALS(func), 0)), "&")) {
+        && STR_EQ(L_SYMBOL(L_FORMALS_N(func, 0)), "&")) {
         if (L_COUNT(L_FORMALS(func)) != 2) {
             return lval_error("Function format invalid. "
                               "Symbol '&' not followed by single symbol.");
