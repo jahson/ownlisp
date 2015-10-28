@@ -7,6 +7,19 @@
 
 #include <editline/readline.h>
 
+
+// possible lval types
+enum {
+    LVAL_INTEGER, // 0
+    LVAL_DECIMAL, // 1
+    LVAL_ERROR, // 2
+    LVAL_SYMBOL, // 3
+    LVAL_SEXPRESSION, // 4
+    LVAL_QEXPRESSION, // 5
+    LVAL_FUNCTION // 5
+};
+
+
 #define STR_EQ(A, B) strcmp((A), (B)) == 0
 #define STR_CONTAIN(A, B) strstr((A), (B))
 
@@ -105,12 +118,6 @@ struct lenv {
     int count;
     char **names;
     lval **values;
-};
-
-// possible lval types
-enum {
-    LVAL_INTEGER, LVAL_DECIMAL, LVAL_ERROR, LVAL_SYMBOL, LVAL_SEXPRESSION,
-    LVAL_QEXPRESSION, LVAL_FUNCTION
 };
 
 // forward declarations
