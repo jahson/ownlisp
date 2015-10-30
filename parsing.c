@@ -80,11 +80,11 @@ enum {
     } \
 
 #define LASSERT_ARGUMENT_TYPE(arguments, argument_number, expected_type, function_name) \
-    if ((L_TYPE(arguments->cell[argument_number]) != expected_type)) { \
+    if ((L_TYPE_N(arguments, argument_number) != expected_type)) { \
         lval *err = lval_error("Incorrect type of argument #%d for '%s'. Got %s, expected %s.", \
                                argument_number + 1, \
                                function_name, \
-                               ltype_name(L_TYPE(arguments->cell[argument_number])), \
+                               ltype_name(L_TYPE_N(arguments, argument_number)), \
                                ltype_name(expected_type)); \
         lval_delete(arguments); \
         return err; \
