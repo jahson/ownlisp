@@ -148,6 +148,11 @@ void lval_println(lenv *env, lval *v);
 lval *lval_pop(lval *v, int i);
 lval *lval_take(lval *v, int i);
 lval *lval_join(lval *x, lval *y);
+lval *builtin_gt(lenv *env, lval *a);
+lval *builtin_lt(lenv *env, lval *a);
+lval *builtin_ge(lenv *env, lval *a);
+lval *builtin_le(lenv *env, lval *a);
+lval *builtin_ord(lenv *env, lval *a, char *operator);
 lval *builtin_lambda(lenv *env, lval *a);
 lval *builtin_op(char *operator, lenv *env, lval *a);
 lval *builtin_add(lenv *env, lval *a);
@@ -643,6 +648,61 @@ lval* lval_join(lval* x, lval* y) {
     }
     lval_delete(y);
     return x;
+}
+
+BUILTIN(gt) {
+    return builtin_ord(env, a, ">");
+}
+
+BUILTIN(lt) {
+    return builtin_ord(env, a, "<");
+}
+
+BUILTIN(ge) {
+    return builtin_ord(env, a, ">=");
+}
+
+BUILTIN(le) {
+    return builtin_ord(env, a, "<=");
+}
+
+lval *builtin_ord(lenv *env, lval *a, char *operator) {
+    LASSERT_ARGUMENT_NUMBER(a, 2, operator);
+    LASSERT(a,
+            L_TYPE_N(a, 0) == LVAL_INTEGER || L_TYPE_N(a, 0) == LVAL_DECIMAL,
+            "Incorrect type of argument #%d for '%s'. Got %s, expected %s or %s.",
+            0,
+            operator,
+            ltype_name(L_TYPE_N(a, 0)),
+            ltype_name(LVAL_INTEGER),
+            ltype_name(LVAL_DECIMAL)
+            );
+    LASSERT(a,
+            L_TYPE_N(a, 1) == LVAL_INTEGER || L_TYPE_N(a, 1) == LVAL_DECIMAL,
+            "Incorrect type of argument #%d for '%s'. Got %s, expected %s or %s.",
+            1,
+            operator,
+            ltype_name(L_TYPE_N(a, 1)),
+            ltype_name(LVAL_INTEGER),
+            ltype_name(LVAL_DECIMAL)
+            );
+
+    int result;
+    if (STR_EQ(operator, ">")) {
+        result = (L_CELL_N(a, 0) > L_CELL_N(a, 1));
+    }
+    if (STR_EQ(operator, "<")) {
+        result = (L_CELL_N(a, 0) < L_CELL_N(a, 1));
+    }
+    if (STR_EQ(operator, ">=")) {
+        result = (L_CELL_N(a, 0) >= L_CELL_N(a, 1));
+    }
+    if (STR_EQ(operator, "<=")) {
+        result = (L_CELL_N(a, 0) <= L_CELL_N(a, 1));
+    }
+
+    lval_delete(a);
+    return lval_integer(result);
 }
 
 BUILTIN(lambda) {
