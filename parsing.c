@@ -36,6 +36,7 @@ enum {
 #define L_ERROR(lval)    (lval)->val.error
 #define L_SYMBOL(lval)   (lval)->val.symbol
 #define L_CELL_N(lval, n) (lval)->cell[(n)]
+#define L_COUNT_N(lval, n) L_CELL_N(lval, n)->count
 #define L_TYPE_N(lval, n) L_CELL_N(lval, n)->type
 #define L_FORMALS_N(lval, n) L_CELL_N(L_FORMALS(lval), n)
 #define L_FORMALS_COUNT(lval) L_COUNT(L_FORMALS(lval))
@@ -63,7 +64,7 @@ enum {
     } \
 
 #define LASSERT_NOT_EMPTY_QEXPR(arguments, function_name) \
-    if (L_COUNT(L_CELL_N(arguments, 0)) == 0) { \
+    if (L_COUNT_N(arguments, 0) == 0) { \
         lval *err = lval_error("Empty Q-Expression for '%s'.", function_name); \
         lval_delete(arguments); \
         return err; \
