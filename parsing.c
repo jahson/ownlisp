@@ -710,7 +710,7 @@ lval *builtin_cmp(lenv *env, lval *a, char *operator) {
         result = lval_eq(L_CELL_N(a, 0), L_CELL_N(a, 1));
     }
 
-    if (STR_EQ(operator, "==")) {
+    if (STR_EQ(operator, "!=")) {
         result = !lval_eq(L_CELL_N(a, 0), L_CELL_N(a, 1));
     }
 
