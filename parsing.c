@@ -754,6 +754,16 @@ lval *builtin_ord(lenv *env, lval *a, char *operator) {
             ltype_name(LVAL_INTEGER),
             ltype_name(LVAL_DECIMAL)
             );
+    LASSERT(a,
+            L_TYPE_N(a, 0) == L_TYPE_N(a, 1),
+            "Argument #2 for '%s' should be of the same type as argument #1.\n"
+            "Got %s and %s, expected %s and %s.",
+            operator,
+            ltype_name(L_TYPE_N(a, 0)),
+            ltype_name(L_TYPE_N(a, 1)),
+            ltype_name(L_TYPE_N(a, 0)),
+            ltype_name(L_TYPE_N(a, 0))
+            );
 
     int result;
     if (STR_EQ(operator, ">")) {
