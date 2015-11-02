@@ -767,16 +767,32 @@ lval *builtin_ord(lenv *env, lval *a, char *operator) {
 
     int result;
     if (STR_EQ(operator, ">")) {
-        result = (L_CELL_N(a, 0) > L_CELL_N(a, 1));
+        if (L_TYPE_N(a, 0) == LVAL_INTEGER) {
+            result = (L_INTEGER(L_CELL_N(a, 0)) > L_INTEGER(L_CELL_N(a, 1)));
+        } else {
+            result = (L_DECIMAL(L_CELL_N(a, 0)) > L_DECIMAL(L_CELL_N(a, 1)));
+        }
     }
     if (STR_EQ(operator, "<")) {
-        result = (L_CELL_N(a, 0) < L_CELL_N(a, 1));
+        if (L_TYPE_N(a, 0) == LVAL_INTEGER) {
+            result = (L_INTEGER(L_CELL_N(a, 0)) < L_INTEGER(L_CELL_N(a, 1)));
+        } else {
+            result = (L_DECIMAL(L_CELL_N(a, 0)) < L_DECIMAL(L_CELL_N(a, 1)));
+        }
     }
     if (STR_EQ(operator, ">=")) {
-        result = (L_CELL_N(a, 0) >= L_CELL_N(a, 1));
+        if (L_TYPE_N(a, 0) == LVAL_INTEGER) {
+            result = (L_INTEGER(L_CELL_N(a, 0)) >= L_INTEGER(L_CELL_N(a, 1)));
+        } else {
+            result = (L_DECIMAL(L_CELL_N(a, 0)) >= L_DECIMAL(L_CELL_N(a, 1)));
+        }
     }
     if (STR_EQ(operator, "<=")) {
-        result = (L_CELL_N(a, 0) <= L_CELL_N(a, 1));
+        if (L_TYPE_N(a, 0) == LVAL_INTEGER) {
+            result = (L_INTEGER(L_CELL_N(a, 0)) <= L_INTEGER(L_CELL_N(a, 1)));
+        } else {
+            result = (L_DECIMAL(L_CELL_N(a, 0)) <= L_DECIMAL(L_CELL_N(a, 1)));
+        }
     }
 
     lval_delete(a);
