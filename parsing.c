@@ -180,6 +180,7 @@ lval *builtin_put(lenv *env, lval *a);
 lval *builtin_exit(lenv *env, lval *a);
 lval *lval_eval_sexpr(lenv *env, lval *v);
 lval *lval_eval(lenv *env, lval *v);
+lval *builtin_if(lenv *env, lval *a);
 lval *builtin_eval(lenv *env, lval *a);
 lval *builtin_join(lenv *env, lval *a);
 void lenv_add_builtin(lenv *env, char *name, lbuiltin fn);
@@ -1259,6 +1260,29 @@ lval* lval_eval(lenv *env, lval *v) {
         return lval_eval_sexpr(env, v);
     }
     return v;
+}
+
+BUILTIN(if) {
+    LASSERT_ARGUMENT_NUMBER(a, 3, "if");
+    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_INTEGER, "if");
+    LASSERT_ARGUMENT_TYPE(a, 1, LVAL_QEXPRESSION, "if");
+    LASSERT_ARGUMENT_TYPE(a, 2, LVAL_QEXPRESSION, "if");
+
+    lval *x;
+    // mark both expressions as evaluable
+    L_TYPE_N(a, 1) = LVAL_SEXPRESSION;
+    L_TYPE_N(a, 2) = LVAL_SEXPRESSION;
+
+    // if condition is true evaluate first expression, otherwise evaluate second
+    if (L_INTEGER(L_CELL_N(a, 0))) {
+        x = lval_eval(env, lval_pop(a, 1));
+    } else {
+        x = lval_eval(env, lval_pop(a, 2));
+    }
+
+    lval_delete(a);
+
+    return x;
 }
 
 BUILTIN(eval) {
