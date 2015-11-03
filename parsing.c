@@ -38,6 +38,8 @@ enum {
 #define L_CELL_N(lval, n) (lval)->cell[(n)]
 #define L_COUNT_N(lval, n) L_CELL_N(lval, n)->count
 #define L_TYPE_N(lval, n) L_CELL_N(lval, n)->type
+#define L_INTEGER_N(lval, n) L_CELL_N(lval, n)->val.integer
+#define L_DECIMAL_N(lval, n) L_CELL_N(lval, n)->val.decimal
 #define L_FORMALS_N(lval, n) L_CELL_N(L_FORMALS(lval), n)
 #define L_FORMALS_COUNT(lval) L_COUNT(L_FORMALS(lval))
 
@@ -769,30 +771,30 @@ lval *builtin_ord(lenv *env, lval *a, char *operator) {
     int result;
     if (STR_EQ(operator, ">")) {
         if (L_TYPE_N(a, 0) == LVAL_INTEGER) {
-            result = (L_INTEGER(L_CELL_N(a, 0)) > L_INTEGER(L_CELL_N(a, 1)));
+            result = (L_INTEGER(L_CELL_N(a, 0)) > L_INTEGER_N(a, 1));
         } else {
-            result = (L_DECIMAL(L_CELL_N(a, 0)) > L_DECIMAL(L_CELL_N(a, 1)));
+            result = (L_DECIMAL(L_CELL_N(a, 0)) > L_DECIMAL_N(a, 1));
         }
     }
     if (STR_EQ(operator, "<")) {
         if (L_TYPE_N(a, 0) == LVAL_INTEGER) {
-            result = (L_INTEGER(L_CELL_N(a, 0)) < L_INTEGER(L_CELL_N(a, 1)));
+            result = (L_INTEGER(L_CELL_N(a, 0)) < L_INTEGER_N(a, 1));
         } else {
-            result = (L_DECIMAL(L_CELL_N(a, 0)) < L_DECIMAL(L_CELL_N(a, 1)));
+            result = (L_DECIMAL(L_CELL_N(a, 0)) < L_DECIMAL_N(a, 1));
         }
     }
     if (STR_EQ(operator, ">=")) {
         if (L_TYPE_N(a, 0) == LVAL_INTEGER) {
-            result = (L_INTEGER(L_CELL_N(a, 0)) >= L_INTEGER(L_CELL_N(a, 1)));
+            result = (L_INTEGER(L_CELL_N(a, 0)) >= L_INTEGER_N(a, 1));
         } else {
-            result = (L_DECIMAL(L_CELL_N(a, 0)) >= L_DECIMAL(L_CELL_N(a, 1)));
+            result = (L_DECIMAL(L_CELL_N(a, 0)) >= L_DECIMAL_N(a, 1));
         }
     }
     if (STR_EQ(operator, "<=")) {
         if (L_TYPE_N(a, 0) == LVAL_INTEGER) {
-            result = (L_INTEGER(L_CELL_N(a, 0)) <= L_INTEGER(L_CELL_N(a, 1)));
+            result = (L_INTEGER(L_CELL_N(a, 0)) <= L_INTEGER_N(a, 1));
         } else {
-            result = (L_DECIMAL(L_CELL_N(a, 0)) <= L_DECIMAL(L_CELL_N(a, 1)));
+            result = (L_DECIMAL(L_CELL_N(a, 0)) <= L_DECIMAL_N(a, 1));
         }
     }
 
