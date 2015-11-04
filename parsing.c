@@ -152,6 +152,7 @@ lval *lval_pop(lval *v, int i);
 lval *lval_take(lval *v, int i);
 lval *lval_join(lval *x, lval *y);
 int lval_eq(lval *x, lval *y);
+lval *builtin_not(lenv *env, lval *a);
 lval *builtin_eq(lenv *env, lval *a);
 lval *builtin_ne(lenv *env, lval *a);
 lval *builtin_cmp(lenv *env, lval *a, char *operator);
@@ -695,6 +696,49 @@ int lval_eq(lval *x, lval *y) {
     }
 
     return 0;
+}
+
+BUILTIN(not) {
+    int result;
+    LASSERT_ARGUMENT_NUMBER(a, 1, "!");
+
+    switch (L_TYPE_N(a, 0)) {
+        case LVAL_INTEGER:
+            if (L_INTEGER_N(a, 0) != 0) {
+                result = 0;
+            } else {
+                result = 1;
+            }
+            break;
+
+        case LVAL_DECIMAL:
+            if (L_DECIMAL_N(a, 0) != 0.0) {
+                result = 0;
+            } else {
+                result = 1;
+            }
+            break;
+
+        case LVAL_SEXPRESSION:
+        case LVAL_QEXPRESSION:
+            if (L_COUNT_N(a, 0) > 0) {
+                result = 0;
+            } else {
+                result = 1;
+            }
+            break;
+
+        default:
+            lval_delete(a);
+            return lval_error("Can only operate on %s, %s, %s, and %s.",
+                              ltype_name(LVAL_INTEGER),
+                              ltype_name(LVAL_DECIMAL),
+                              ltype_name(LVAL_SEXPRESSION),
+                              ltype_name(LVAL_QEXPRESSION));
+    }
+
+    lval_delete(a);
+    return lval_integer(result);
 }
 
 BUILTIN(eq) {
@@ -1344,6 +1388,7 @@ void lenv_add_builtins(lenv *env) {
 
     /* Comparison functions */
     lenv_add_builtin(env, "if", builtin_if);
+    lenv_add_builtin(env, "!", builtin_not);
     lenv_add_builtin(env, "==", builtin_eq);
     lenv_add_builtin(env, "!=", builtin_ne);
     lenv_add_builtin(env, ">", builtin_gt);
