@@ -153,6 +153,7 @@ lval *lval_take(lval *v, int i);
 lval *lval_join(lval *x, lval *y);
 int lval_eq(lval *x, lval *y);
 lval *builtin_and(lenv *env, lval *a);
+lval *builtin_or(lenv *env, lval *a);
 lval *builtin_not(lenv *env, lval *a);
 lval *builtin_eq(lenv *env, lval *a);
 lval *builtin_ne(lenv *env, lval *a);
@@ -706,6 +707,18 @@ BUILTIN(and) {
     LASSERT_ARGUMENT_TYPE(a, 1, LVAL_INTEGER, "&&");
 
     result = L_INTEGER_N(a, 0) && L_INTEGER_N(a, 1);
+    lval_delete(a);
+
+    return lval_integer(result);
+}
+
+BUILTIN(or) {
+    int result;
+    LASSERT_ARGUMENT_NUMBER(a, 2, "&&");
+    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_INTEGER, "&&");
+    LASSERT_ARGUMENT_TYPE(a, 1, LVAL_INTEGER, "&&");
+
+    result = L_INTEGER_N(a, 0) || L_INTEGER_N(a, 1);
     lval_delete(a);
 
     return lval_integer(result);
@@ -1403,6 +1416,7 @@ void lenv_add_builtins(lenv *env) {
     lenv_add_builtin(env, "if", builtin_if);
     lenv_add_builtin(env, "!", builtin_not);
     lenv_add_builtin(env, "&&", builtin_and);
+    lenv_add_builtin(env, "||", builtin_or);
     lenv_add_builtin(env, "==", builtin_eq);
     lenv_add_builtin(env, "!=", builtin_ne);
     lenv_add_builtin(env, ">", builtin_gt);
