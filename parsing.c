@@ -16,7 +16,8 @@ enum {
     LVAL_SYMBOL, // 3
     LVAL_SEXPRESSION, // 4
     LVAL_QEXPRESSION, // 5
-    LVAL_FUNCTION // 5
+    LVAL_FUNCTION, // 5
+    LVAL_BOOLEAN // 6
 };
 
 
@@ -208,6 +209,8 @@ char* ltype_name(int t) {
             return "Q-Expression";
         case LVAL_FUNCTION:
             return "Function";
+        case LVAL_BOOLEAN:
+            return "Boolean";
         default:
             return "Unknown";
     }
@@ -376,6 +379,7 @@ lval* lval_copy(lval *a) {
             }
             break;
         case LVAL_INTEGER:
+        case LVAL_BOOLEAN:
             L_INTEGER(x) = L_INTEGER(a);
             break;
         case LVAL_DECIMAL:
@@ -399,6 +403,14 @@ lval* lval_copy(lval *a) {
             break;
     }
     return x;
+}
+
+lval *lval_boolean(int x) {
+    lval *v = malloc(sizeof(lval));
+    L_TYPE(v) = LVAL_BOOLEAN;
+    L_INTEGER(v) = (x != 0);
+
+    return v;
 }
 
 lval* lval_error(char* format, ...) {
@@ -591,6 +603,9 @@ void lval_expr_print(lenv *env, lval *v, char open, char close) {
 
 void lval_print(lenv *env, lval *v) {
     switch (L_TYPE(v)) {
+        case LVAL_BOOLEAN:
+            printf(L_INTEGER(v) == 0 ? "false" : "true");
+            break;
         case LVAL_INTEGER:
             printf("%li", L_INTEGER(v));
             break;
@@ -669,6 +684,7 @@ int lval_eq(lval *x, lval *y) {
 
     // compare based upon type
     switch (x->type) {
+        case LVAL_BOOLEAN:
         case LVAL_INTEGER:
             return (L_INTEGER(x) == L_INTEGER(y));
         case LVAL_DECIMAL:
@@ -703,25 +719,25 @@ int lval_eq(lval *x, lval *y) {
 BUILTIN(and) {
     int result;
     LASSERT_ARGUMENT_NUMBER(a, 2, "&&");
-    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_INTEGER, "&&");
-    LASSERT_ARGUMENT_TYPE(a, 1, LVAL_INTEGER, "&&");
+    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_BOOLEAN, "&&");
+    LASSERT_ARGUMENT_TYPE(a, 1, LVAL_BOOLEAN, "&&");
 
     result = L_INTEGER_N(a, 0) && L_INTEGER_N(a, 1);
     lval_delete(a);
 
-    return lval_integer(result);
+    return lval_boolean(result);
 }
 
 BUILTIN(or) {
     int result;
-    LASSERT_ARGUMENT_NUMBER(a, 2, "&&");
-    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_INTEGER, "&&");
-    LASSERT_ARGUMENT_TYPE(a, 1, LVAL_INTEGER, "&&");
+    LASSERT_ARGUMENT_NUMBER(a, 2, "||");
+    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_BOOLEAN, "||");
+    LASSERT_ARGUMENT_TYPE(a, 1, LVAL_BOOLEAN, "||");
 
     result = L_INTEGER_N(a, 0) || L_INTEGER_N(a, 1);
     lval_delete(a);
 
-    return lval_integer(result);
+    return lval_boolean(result);
 }
 
 BUILTIN(not) {
@@ -764,7 +780,7 @@ BUILTIN(not) {
     }
 
     lval_delete(a);
-    return lval_integer(result);
+    return lval_boolean(result);
 }
 
 BUILTIN(eq) {
@@ -788,7 +804,7 @@ lval *builtin_cmp(lenv *env, lval *a, char *operator) {
     }
 
     lval_delete(a);
-    return lval_integer(result);
+    return lval_boolean(result);
 }
 
 BUILTIN(gt) {
@@ -869,7 +885,7 @@ lval *builtin_ord(lenv *env, lval *a, char *operator) {
     }
 
     lval_delete(a);
-    return lval_integer(result);
+    return lval_boolean(result);
 }
 
 BUILTIN(lambda) {
@@ -1336,7 +1352,7 @@ lval* lval_eval(lenv *env, lval *v) {
 
 BUILTIN(if) {
     LASSERT_ARGUMENT_NUMBER(a, 3, "if");
-    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_INTEGER, "if");
+    LASSERT_ARGUMENT_TYPE(a, 0, LVAL_BOOLEAN, "if");
     LASSERT_ARGUMENT_TYPE(a, 1, LVAL_QEXPRESSION, "if");
     LASSERT_ARGUMENT_TYPE(a, 2, LVAL_QEXPRESSION, "if");
 
@@ -1387,6 +1403,13 @@ void lenv_add_builtin(lenv *env, char *name, lbuiltin fn) {
     lval_delete(value);
 }
 
+void lenv_add_builtin_constant(lenv *env, char *name, lval *value) {
+    lval *key = lval_symbol(name);
+    lenv_put(env, key, value);
+    lval_delete(key);
+    lval_delete(value);
+}
+
 void lenv_add_builtins(lenv *env) {
     /* List Functions */
     lenv_add_builtin(env, "list", builtin_list);
@@ -1427,6 +1450,10 @@ void lenv_add_builtins(lenv *env) {
     /* Other */
     lenv_add_builtin(env, "exit", builtin_exit);
     lenv_add_builtin(env, "\\", builtin_lambda);
+
+    /* Constants */
+    lenv_add_builtin_constant(env, "true", lval_boolean(1));
+    lenv_add_builtin_constant(env, "false", lval_boolean(0));
 }
 
 int main(int argc, char** argv) {
