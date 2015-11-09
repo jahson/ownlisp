@@ -17,7 +17,8 @@ enum {
     LVAL_SEXPRESSION, // 4
     LVAL_QEXPRESSION, // 5
     LVAL_FUNCTION, // 5
-    LVAL_BOOLEAN // 6
+    LVAL_BOOLEAN, // 6
+    LVAL_STRING // 7
 };
 
 
@@ -36,6 +37,7 @@ enum {
 #define L_DECIMAL(lval)  (lval)->val.decimal
 #define L_ERROR(lval)    (lval)->val.error
 #define L_SYMBOL(lval)   (lval)->val.symbol
+#define L_STRING(lval)   (lval)->val.string
 #define L_CELL_N(lval, n) (lval)->cell[(n)]
 #define L_COUNT_N(lval, n) L_CELL_N(lval, n)->count
 #define L_TYPE_N(lval, n) L_CELL_N(lval, n)->type
@@ -108,6 +110,7 @@ struct lval {
         double decimal;
         char *error;
         char *symbol;
+        char *string;
         lbuiltin builtin;
     } val;
     lenv *env;
@@ -484,6 +487,14 @@ lval* lval_function(lbuiltin fn) {
     lval* v = malloc(sizeof(lval));
     L_TYPE(v) = LVAL_FUNCTION;
     L_BUILTIN(v) = fn;
+    return v;
+}
+
+lval *lval_string(char *str) {
+    lval* v = malloc(sizeof(lval));
+    L_TYPE(v) = LVAL_STRING;
+    L_STRING(v) = malloc(strlen(str) + 1);
+    strcpy(L_STRING(v), str)
     return v;
 }
 
