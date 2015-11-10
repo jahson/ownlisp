@@ -198,6 +198,8 @@ int main(int argc, char **argv);
 
 char* ltype_name(int t) {
     switch (t) {
+        case LVAL_STRING:
+            return "String";
         case LVAL_INTEGER:
             return "Integer";
         case LVAL_DECIMAL:
@@ -322,6 +324,9 @@ lval* lval_call(lenv *env, lval *func, lval *a) {
 
 void lval_delete(lval* v) {
     switch (L_TYPE(v)) {
+        case LVAL_STRING:
+            free(L_STRING(v));
+            break;
         case LVAL_INTEGER:
         case LVAL_DECIMAL:
             break;
@@ -371,6 +376,9 @@ lval* lval_copy(lval *a) {
     L_TYPE(x) = L_TYPE(a);
 
     switch (L_TYPE(a)) {
+        case LVAL_STRING:
+            L_STRING(x) = malloc(strlen(L_STRING(v)) + 1);
+            strcpy(L_STRING(x), L_STRING(y))
         case LVAL_FUNCTION:
             if (L_BUILTIN(a)) {
                 L_BUILTIN(x) = L_BUILTIN(a);
@@ -695,6 +703,8 @@ int lval_eq(lval *x, lval *y) {
 
     // compare based upon type
     switch (x->type) {
+        case LVAL_STRING:
+            return STR_EQ(L_STRING(x), L_STRING(v));
         case LVAL_BOOLEAN:
         case LVAL_INTEGER:
             return (L_INTEGER(x) == L_INTEGER(y));
