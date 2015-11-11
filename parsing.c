@@ -620,8 +620,19 @@ void lval_expr_print(lenv *env, lval *v, char open, char close) {
     putchar(close);
 }
 
+void lval_print_string(lval *v) {
+    char *escaped = malloc(strlen(L_STRING(v)) + 1);
+    strcpy(escaped, L_STRING(v));
+    escaped = mpcf_escape(escaped);
+    printf("\"%s\"", escaped);
+    free(escaped);
+}
+
 void lval_print(lenv *env, lval *v) {
     switch (L_TYPE(v)) {
+        case LVAL_STRING:
+            lval_print_string(v);
+            break;
         case LVAL_BOOLEAN:
             printf(L_INTEGER(v) == 0 ? "false" : "true");
             break;
